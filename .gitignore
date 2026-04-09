@@ -1,0 +1,15 @@
+backend/venv/
+frontend/node_modules/
+workspace/src/
+workspace/logs/
+workspace/errors/
+workspace/plan.json
+workspace/status.txt
+workspace/test_results.txt
+__pycache__/
+*.pyc
+*.db
+*.sqlite
+.env
+dist/
+.vercel/
