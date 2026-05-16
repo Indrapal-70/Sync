@@ -266,7 +266,7 @@ function WorkflowDAG() {
         className="rf-dark"
       >
         <Background gap={24} size={1} color="#2a2a2a" />
-        <Controls position="bottom-center" showInteractive={false} />
+        <Controls position="bottom-right" showInteractive={false} />
       </ReactFlow>
     </div>
   )
