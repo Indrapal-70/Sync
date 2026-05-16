@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: sync-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: syncuser
+      POSTGRES_PASSWORD: syncpass
+      POSTGRES_DB: syncdb
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    container_name: sync-redis
+    restart: always
+    ports:
+      - "6379:6379"
