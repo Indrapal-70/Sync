@@ -6,3 +6,8 @@ redis
 pydantic
 pydantic-settings
 python-dotenv
+websockets
+httpx
+alembic
+asyncpg
+aioredis
