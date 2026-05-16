@@ -1,18 +1,25 @@
+version: '3.8'
+
 services:
   postgres:
-    image: postgres:16
-    container_name: sync-postgres
-    restart: always
+    image: postgres:15
+    container_name: sync_postgres
     environment:
-      POSTGRES_USER: syncuser
-      POSTGRES_PASSWORD: syncpass
-      POSTGRES_DB: syncdb
+      POSTGRES_USER: sync_user
+      POSTGRES_PASSWORD: sync_pass
+      POSTGRES_DB: sync_db
     ports:
       - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
 
   redis:
-    image: redis:7
-    container_name: sync-redis
-    restart: always
+    image: redis:7-alpine
+    container_name: sync_redis
     ports:
       - "6379:6379"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
