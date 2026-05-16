@@ -79,7 +79,7 @@ function AppLayout() {
                   <Icon size={16} />
                   <span>{item.label}</span>
                 </NavLink>
-              )}
+              )
             })}
           </div>
         </div>
