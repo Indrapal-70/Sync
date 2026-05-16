@@ -31,7 +31,7 @@ const mockLogs = [
   {
     id: 'log-1',
     agentId: 'SYN-CORE-01',
-    nodeId: 'node-primary',
+    nodeId: 'processor-1',
     time: '10:42:01',
     level: 'INFO',
     message: 'Initializing environment sequence...',
@@ -39,7 +39,7 @@ const mockLogs = [
   {
     id: 'log-2',
     agentId: 'SYN-CORE-01',
-    nodeId: 'node-primary',
+    nodeId: 'processor-1',
     time: '10:42:02',
     level: 'SUCCESS',
     message: 'Dependencies loaded (142ms)',
@@ -47,7 +47,7 @@ const mockLogs = [
   {
     id: 'log-3',
     agentId: 'SYN-CORE-01',
-    nodeId: 'node-primary',
+    nodeId: 'processor-1',
     time: '10:42:05',
     level: 'INFO',
     message: 'Beginning routine tasks mapping.',
@@ -55,7 +55,7 @@ const mockLogs = [
   {
     id: 'log-4',
     agentId: 'SYN-CORE-01',
-    nodeId: 'node-primary',
+    nodeId: 'processor-1',
     time: '10:42:15',
     level: 'WARN',
     message: 'Memory threshold approaching warning level (78%).',
@@ -63,7 +63,7 @@ const mockLogs = [
   {
     id: 'log-5',
     agentId: 'SYN-CORE-01',
-    nodeId: 'node-primary',
+    nodeId: 'processor-1',
     time: '10:42:18',
     level: 'INFO',
     message: 'Compiling routine sub-module alpha...',
@@ -71,7 +71,7 @@ const mockLogs = [
   {
     id: 'log-6',
     agentId: 'SYN-CORE-01',
-    nodeId: 'node-primary',
+    nodeId: 'processor-1',
     time: '10:42:21',
     level: 'EXEC',
     message: 'function parseDataStream(input_buffer) {',

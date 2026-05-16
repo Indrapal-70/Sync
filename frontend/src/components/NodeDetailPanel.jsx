@@ -10,7 +10,7 @@ function NodeDetailPanel({ node, logs, onClose }) {
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: 320, opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="absolute top-0 right-0 h-full w-full md:w-[320px] bg-[#1a1a1a]/95 border-l border-[#2a2a2a] shadow-2xl flex flex-col z-30"
+          className="absolute top-0 right-0 h-full w-full md:w-[280px] bg-[#1a1a1a]/95 border-l border-[#2a2a2a] shadow-2xl flex flex-col z-30"
         >
           <div className="p-4 border-b border-[#2a2a2a] flex justify-between items-center bg-[#202020]/60">
             <h2 className="text-[16px] font-semibold text-[#f0f0f0]">Node Details</h2>
