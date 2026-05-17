@@ -133,18 +133,17 @@ const nodeTypes = {
   validationLoop: ValidationLoopNode,
 }
 
-function WorkflowDAG() {
-  const nodes = useMemo(
-    () => [
+function WorkflowDAG({ workflow, tasks }) {
+  const nodes = useMemo(() => {
+    const base = [
       {
         id: 'primary',
         type: 'primaryObjective',
         position: { x: 260, y: 40 },
         data: {
-          id: 'TSK-8892',
-          title: 'Implement User Auth',
-          description:
-            'Design and implement a secure JWT-based authentication system supporting registration, login, and token refresh workflows.',
+          id: workflow?.id || 'workflow',
+          title: workflow?.name || 'Workflow',
+          description: workflow?.description || 'No description provided.',
         },
       },
       {
@@ -153,68 +152,33 @@ function WorkflowDAG() {
         position: { x: 390, y: 240 },
         data: {},
       },
-      {
-        id: 'seq-1',
-        type: 'sequence',
-        position: { x: 70, y: 340 },
-        data: {
-          sequence: '01',
-          title: 'Schema Design',
-          status: 'passed',
-          agent: 'DB Admin Agent',
-          meta: '100%',
-          icon: <Database size={16} className="text-[#888888]" />,
-        },
-      },
-      {
-        id: 'seq-2',
-        type: 'sequence',
-        position: { x: 380, y: 340 },
-        data: {
-          sequence: '02',
-          title: 'JWT Logic',
-          status: 'failed',
-          error: 'SYNTAX ERROR LINE 42',
-          agent: 'Security Eng Agent',
-          meta: 'ITER 3',
-          icon: <Shield size={16} className="text-[#888888]" />,
-        },
-      },
-      {
-        id: 'seq-3',
-        type: 'sequence',
-        position: { x: 690, y: 340 },
-        data: {
-          sequence: '03',
-          title: 'API Endpoints',
-          status: 'pending',
-          agent: 'Programmer Agent',
-          meta: 'LOCK',
-          icon: <Database size={16} className="text-[#888888]" />,
-        },
-      },
-      {
-        id: 'validation',
-        type: 'validationLoop',
-        position: { x: 180, y: 560 },
-        data: {
-          debuggerLogs: [
-            '> Analyzing trace...',
-            '> Invalid signature exception detected.',
-            '> Formulating patch prompt...',
-          ],
-          tests: [
-            { name: 'auth_test.py::test_login', status: 'PASS' },
-            { name: 'auth_test.py::test_refresh', status: 'FAIL' },
-          ],
-        },
-      },
-    ],
-    [],
-  )
+    ]
 
-  const edges = useMemo(
-    () => [
+    const taskNodes = (tasks || []).map((task, index) => ({
+      id: task.id,
+      type: 'sequence',
+      position: { x: 70 + index * 310, y: 340 },
+      data: {
+        sequence: String(index + 1).padStart(2, '0'),
+        title: task.name,
+        status: task.status === 'completed' ? 'passed' : task.status === 'failed' ? 'failed' : 'pending',
+        error: task.status === 'failed' ? 'FAILED' : null,
+        agent: task.agent_name || 'Unassigned',
+        meta: task.status.toUpperCase(),
+        icon:
+          task.agent_name === 'tester'
+            ? <Shield size={16} className="text-[#888888]" />
+            : task.agent_name === 'debugger'
+              ? <Bug size={16} className="text-[#888888]" />
+              : <Database size={16} className="text-[#888888]" />,
+      },
+    }))
+
+    return [...base, ...taskNodes]
+  }, [workflow, tasks])
+
+  const edges = useMemo(() => {
+    const base = [
       {
         id: 'e1',
         source: 'primary',
@@ -222,37 +186,18 @@ function WorkflowDAG() {
         type: 'smoothstep',
         style: { stroke: '#353535' },
       },
-      {
-        id: 'e2',
-        source: 'divider',
-        target: 'seq-1',
-        type: 'smoothstep',
-        style: { stroke: '#353535' },
-      },
-      {
-        id: 'e3',
-        source: 'divider',
-        target: 'seq-2',
-        type: 'smoothstep',
-        style: { stroke: '#353535' },
-      },
-      {
-        id: 'e4',
-        source: 'divider',
-        target: 'seq-3',
-        type: 'smoothstep',
-        style: { stroke: '#353535' },
-      },
-      {
-        id: 'e5',
-        source: 'seq-2',
-        target: 'validation',
-        type: 'smoothstep',
-        style: { stroke: '#4f6ef7', strokeDasharray: '4 4' },
-      },
-    ],
-    [],
-  )
+    ]
+
+    const taskEdges = (tasks || []).map((task) => ({
+      id: `edge-${task.id}`,
+      source: 'divider',
+      target: task.id,
+      type: 'smoothstep',
+      style: { stroke: '#353535' },
+    }))
+
+    return [...base, ...taskEdges]
+  }, [tasks])
 
   return (
     <div className="h-full w-full">

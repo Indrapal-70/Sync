@@ -85,4 +85,5 @@ def delete_task(task_id: UUID, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Task not found")
     db.delete(task)
     db.commit()
+    publish_event("task_deleted", {"id": str(task_id)})
     return {"message": "Task deleted"}

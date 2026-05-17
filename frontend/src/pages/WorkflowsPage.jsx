@@ -1,19 +1,32 @@
 import { motion } from 'framer-motion'
-import { useMemo } from 'react'
-import { ChevronRight, Zap } from 'lucide-react'
+import { useEffect, useMemo } from 'react'
+import { ChevronRight, Zap, Play } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import WorkflowDAG from '../components/WorkflowDAG.jsx'
 import useWorkflowStore from '../store/workflowStore.js'
+import useTaskStore from '../store/taskStore.js'
 
 function WorkflowsPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { workflows } = useWorkflowStore()
+  const { workflows, fetchWorkflows, executeWorkflow } = useWorkflowStore()
+  const { tasks, fetchTasks } = useTaskStore()
+
+  useEffect(() => {
+    fetchWorkflows()
+    fetchTasks()
+  }, [fetchWorkflows, fetchTasks])
 
   const workflowName = useMemo(() => {
     const workflow = workflows.find((item) => item.id === id)
     return workflow?.name || 'Task Divider Bot'
   }, [workflows, id])
+
+  const workflow = useMemo(() => workflows.find((item) => item.id === id), [workflows, id])
+  const workflowTasks = useMemo(
+    () => tasks.filter((task) => task.workflow_id === id),
+    [tasks, id],
+  )
 
   return (
     <motion.div
@@ -37,17 +50,27 @@ function WorkflowsPage() {
               Deconstruction Active
             </span>
           </div>
-          <button
-            className="text-[10px] uppercase tracking-widest px-3 py-2 rounded border border-[#2a2a2a] text-[#f0f0f0] hover:bg-[#1a1a1a] transition-colors flex items-center gap-2"
-            type="button"
-            onClick={() => navigate(`/workflows/${id}/builder`)}
-          >
-            <Zap size={14} /> Open Builder
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              className="text-[10px] uppercase tracking-widest px-3 py-2 rounded border border-[#2a2a2a] text-[#f0f0f0] hover:bg-[#1a1a1a] transition-colors flex items-center gap-2"
+              type="button"
+              onClick={() => executeWorkflow(id)}
+              disabled={!id}
+            >
+              <Play size={14} /> Execute
+            </button>
+            <button
+              className="text-[10px] uppercase tracking-widest px-3 py-2 rounded border border-[#2a2a2a] text-[#f0f0f0] hover:bg-[#1a1a1a] transition-colors flex items-center gap-2"
+              type="button"
+              onClick={() => navigate(`/workflows/${id}/builder`)}
+            >
+              <Zap size={14} /> Open Builder
+            </button>
+          </div>
         </div>
       </header>
       <div className="flex-1 bg-[#0a0a0a]">
-        <WorkflowDAG />
+        <WorkflowDAG workflow={workflow} tasks={workflowTasks} />
       </div>
     </motion.div>
   )

@@ -26,15 +26,15 @@ function NodeDetailPanel({ node, logs, onClose }) {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="px-2 py-0.5 rounded text-[10px] uppercase tracking-widest bg-[#2a2a2a] text-[#f0f0f0] border border-[#2a2a2a]">
-                  Programmer
+                  {node?.data?.agent || 'Agent'}
                 </span>
                 <span className="px-2 py-0.5 rounded text-[10px] uppercase tracking-widest bg-[#2a2a2a] text-[#888888]">
-                  GPT-4-Turbo
+                  {node?.data?.statusLabel || 'Status'}
                 </span>
               </div>
               <h3 className="text-[18px] font-semibold text-[#f0f0f0]">{node?.data?.label}</h3>
               <p className="text-[12px] text-[#888888] mt-1">
-                ID: {node?.id} | Started 2m ago
+                ID: {node?.id}
               </p>
             </div>
 
@@ -76,7 +76,10 @@ function NodeDetailPanel({ node, logs, onClose }) {
                 <div className="p-3 border-t border-[#2a2a2a] bg-[#0f0f0f] font-mono text-[11px] space-y-1">
                   {logs.map((entry) => (
                     <div key={entry.id} className="text-[#888888]">
-                      <span className="text-[#555555]">{entry.time}</span> [{entry.level}] {entry.message}
+                      <span className="text-[#555555]">
+                        {new Date(entry.created_at).toLocaleTimeString()}
+                      </span>{' '}
+                      [{entry.level}] {entry.message}
                     </div>
                   ))}
                 </div>

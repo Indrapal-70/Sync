@@ -1,30 +1,37 @@
 import { motion } from 'framer-motion'
 import { MoreHorizontal, Search } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import useWorkflowStore from '../store/workflowStore.js'
 import useTaskStore from '../store/taskStore.js'
 import TaskKanbanCard from '../components/TaskKanbanCard.jsx'
 
 const columns = [
   { key: 'pending', title: 'Backlog' },
   { key: 'running', title: 'In Progress' },
-  { key: 'testing', title: 'Testing' },
   { key: 'completed', title: 'Done' },
+  { key: 'failed', title: 'Failed' },
 ]
 
 function KanbanPage() {
-  const { tasks } = useTaskStore()
+  const { fetchWorkflows } = useWorkflowStore()
+  const { tasks, fetchTasks } = useTaskStore()
   const [selectedAgents, setSelectedAgents] = useState([])
   const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    fetchWorkflows()
+    fetchTasks()
+  }, [fetchWorkflows, fetchTasks])
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
       const matchesAgent =
-        selectedAgents.length === 0 || selectedAgents.includes(task.agentType)
+        selectedAgents.length === 0 || selectedAgents.includes(task.agent_name)
       const query = search.trim().toLowerCase()
       const matchesSearch =
         query.length === 0 ||
-        task.title.toLowerCase().includes(query) ||
-        task.description.toLowerCase().includes(query)
+        task.name.toLowerCase().includes(query) ||
+        (task.description || '').toLowerCase().includes(query)
       return matchesAgent && matchesSearch
     })
   }, [tasks, selectedAgents, search])

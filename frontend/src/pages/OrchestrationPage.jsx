@@ -1,3 +1,4 @@
+import { useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { CheckCircle2, TrendingDown, TrendingUp } from 'lucide-react'
 import useAgentStore from '../store/agentStore.js'
@@ -8,17 +9,30 @@ import AgentCard from '../components/AgentCard.jsx'
 
 function OrchestrationPage() {
   const { agents, activeCount, totalDeployed } = useAgentStore()
-  const { tasks } = useWorkflowStore()
-  const { tasks: taskList } = useTaskStore()
-  const { alerts, clearAlerts } = useLogStore()
+  const { workflows, fetchWorkflows } = useWorkflowStore()
+  const { tasks: taskList, fetchTasks } = useTaskStore()
+  const { logs } = useLogStore()
 
-  const completedTasks = taskList.filter((task) => task.status === 'completed').length
-  const successRate = taskList.length
-    ? Math.round((completedTasks / taskList.length) * 1000) / 10
+  useEffect(() => {
+    fetchWorkflows()
+    fetchTasks()
+  }, [fetchWorkflows, fetchTasks])
+
+  const totalWorkflows = workflows.length
+  const completedWorkflows = workflows.filter((workflow) => workflow.status === 'completed').length
+  const successRate = totalWorkflows
+    ? Math.round((completedWorkflows / totalWorkflows) * 1000) / 10
     : 0
-  const isHealthy = agents.every((agent) => agent.status !== 'error')
-
-  const filteredAlerts = alerts.filter((alert) => ['warning', 'error'].includes(alert.level))
+  const failedWorkflows = useMemo(
+    () => workflows.filter((workflow) => workflow.status === 'failed').length,
+    [workflows],
+  )
+  const isHealthy = failedWorkflows === 0
+  const filteredAlerts = useMemo(
+    () => logs.filter((log) => ['warning', 'error'].includes(log.level)),
+    [logs],
+  )
+  const totalWorkflowsCount = workflows.length
 
   return (
     <motion.div
@@ -50,12 +64,12 @@ function OrchestrationPage() {
           <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
               <span className="text-[10px] uppercase tracking-widest text-[#888888]">
-                Total Tasks
+                Total Workflows
               </span>
               <CheckCircle2 size={18} className="text-[#4f6ef7]" />
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-[32px] text-[#f0f0f0] font-semibold">{tasks.length}</span>
+              <span className="text-[32px] text-[#f0f0f0] font-semibold">{totalWorkflowsCount}</span>
               <span className="text-[10px] text-[#4f6ef7] flex items-center gap-1">
                 <TrendingUp size={14} /> 12%
               </span>
@@ -130,13 +144,9 @@ function OrchestrationPage() {
             <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl overflow-hidden flex flex-col h-full max-h-[400px]">
               <div className="p-4 border-b border-[#2a2a2a] flex justify-between items-center bg-[#111111]">
                 <h3 className="text-[18px] text-[#f0f0f0]">Recent Alerts</h3>
-                <button
-                  className="text-[10px] uppercase tracking-widest text-[#4f6ef7] hover:text-[#f0f0f0]"
-                  type="button"
-                  onClick={clearAlerts}
-                >
-                  Clear All
-                </button>
+                <span className="text-[10px] uppercase tracking-widest text-[#4f6ef7]">
+                  Live Feed
+                </span>
               </div>
               <div className="flex-1 overflow-y-auto p-2 space-y-2">
                 {filteredAlerts.map((alert) => (
@@ -146,21 +156,23 @@ function OrchestrationPage() {
                   >
                     <div
                       className={`w-2 h-2 mt-2 rounded-full ${
-                        alert.type === 'memory'
+                        alert.level === 'error'
                           ? 'bg-[#ef4444]'
-                          : alert.type === 'warning'
+                          : alert.level === 'warning'
                             ? 'bg-[#f59e0b]'
                             : 'bg-[#4f6ef7]'
                       }`}
                     />
                     <div>
                       <div className="text-[12px] font-semibold text-[#f0f0f0]">
-                        {alert.title}
+                        {alert.level.toUpperCase()}
                       </div>
                       <div className="font-mono text-[12px] text-[#888888] mt-1">
-                        {alert.description}
+                        {alert.message}
                       </div>
-                      <div className="text-[10px] text-[#888888] mt-2">{alert.timeAgo}</div>
+                      <div className="text-[10px] text-[#888888] mt-2">
+                        {new Date(alert.created_at).toLocaleTimeString()}
+                      </div>
                     </div>
                   </div>
                 ))}

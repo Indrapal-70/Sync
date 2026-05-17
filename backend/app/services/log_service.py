@@ -1,9 +1,10 @@
-from app.models.workflow_log import WorkflowLog
-from app.services.redis_client import publish_event
-import uuid
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
+import uuid
+
+from app.models.workflow_log import WorkflowLog
+from app.services.redis_client import publish_event
 
 def create_log(
     db,

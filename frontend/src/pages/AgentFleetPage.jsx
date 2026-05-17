@@ -14,8 +14,37 @@ function getBarColor(value) {
 
 function AgentFleetPage() {
   const { id } = useParams()
-  const { selectedAgent, selectAgent } = useAgentStore()
-  const { subtasks } = useTaskStore()
+  const { selectedAgent, selectAgent, setAgents } = useAgentStore()
+  const { tasks, fetchTasks } = useTaskStore()
+
+  useEffect(() => {
+    fetchTasks()
+  }, [fetchTasks])
+
+  const runningTasks = useMemo(() => tasks.filter((task) => task.status === 'running'), [tasks])
+  const agentMap = useMemo(() => {
+    const map = new Map()
+    runningTasks.forEach((task, index) => {
+      const key = task.agent_name || `agent-${index}`
+      if (!map.has(key)) {
+        map.set(key, {
+          id: key,
+          name: task.agent_name || 'Unassigned',
+          status: 'running',
+          currentTask: task.name,
+          nodeId: task.workflow_id,
+          resources: { cpu: 42, ramPercent: 68, networkMBs: 12 },
+        })
+      }
+    })
+    return Array.from(map.values())
+  }, [runningTasks])
+
+  useEffect(() => {
+    if (agentMap.length) {
+      setAgents(agentMap)
+    }
+  }, [agentMap, setAgents])
 
   useEffect(() => {
     if (id) {
@@ -23,10 +52,10 @@ function AgentFleetPage() {
     }
   }, [id, selectAgent])
 
-  const activeAgent = selectedAgent
+  const activeAgent = selectedAgent || agentMap[0]
   const agentSubtasks = useMemo(
-    () => subtasks.filter((task) => task.agentId === activeAgent?.id),
-    [subtasks, activeAgent],
+    () => tasks.filter((task) => task.agent_name === activeAgent?.name),
+    [tasks, activeAgent],
   )
 
   if (!activeAgent) {
@@ -77,7 +106,7 @@ function AgentFleetPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 mt-6 min-h-0">
         <div className="lg:col-span-2 min-h-0">
-          <ExecutionLogPanel agentId={activeAgent.id} />
+          <ExecutionLogPanel agentId={activeAgent.nodeId} />
         </div>
         <div className="space-y-6 flex flex-col min-h-0">
           <div className="bg-[#1a1a1a]/70 border border-[#2a2a2a] rounded-xl p-4 flex-1">
@@ -140,12 +169,12 @@ function AgentFleetPage() {
                   {task.status === 'running' && (
                     <Loader2 size={18} className="text-[#4f6ef7] animate-spin" />
                   )}
-                  {task.status === 'queued' && (
+                  {task.status === 'pending' && (
                     <Clock size={18} className="text-[#888888]" />
                   )}
                   <div>
-                    <p className="text-[12px] text-[#f0f0f0]">{task.title}</p>
-                    <p className="text-[11px] text-[#888888] mt-1">{task.detail}</p>
+                    <p className="text-[12px] text-[#f0f0f0]">{task.name}</p>
+                    <p className="text-[11px] text-[#888888] mt-1">{task.description}</p>
                   </div>
                 </div>
               ))}

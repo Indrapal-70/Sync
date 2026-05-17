@@ -1,16 +1,31 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 from app.database.session import get_db
 from app.models.workflow import Workflow
+from app.models.task import Task
 from app.schemas.workflow import WorkflowCreate, WorkflowUpdate, WorkflowResponse
 from app.services.redis_client import publish_event
 from app.services.log_service import create_log
+from app.agents.mock_agent import run_mock_agent
+from app.agents.planner_agent import plan_workflow
 import uuid
 from datetime import datetime
 
 router = APIRouter(prefix="/api/workflows", tags=["Workflows"])
+
+
+def run_mock_agent_sync(workflow_id: UUID):
+    import asyncio
+
+    from app.database.session import SessionLocal
+
+    db = SessionLocal()
+    try:
+        asyncio.run(run_mock_agent(workflow_id, db))
+    finally:
+        db.close()
 
 @router.post("", response_model=WorkflowResponse)
 def create_workflow(workflow_in: WorkflowCreate, db: Session = Depends(get_db)):
@@ -74,3 +89,59 @@ def delete_workflow(workflow_id: UUID, db: Session = Depends(get_db)):
     
     publish_event("workflow_deleted", {"id": str(workflow_id)})
     return {"message": "Workflow deleted successfully"}
+
+
+@router.post("/{workflow_id}/execute")
+async def execute_workflow(
+    workflow_id: UUID,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    task_plan = await plan_workflow(workflow.description or workflow.name)
+    created_count = 0
+
+    new_tasks = []
+    for task_data in task_plan:
+        task = Task(
+            id=uuid.uuid4(),
+            workflow_id=workflow_id,
+            name=task_data.get("name", "Untitled Task"),
+            description=task_data.get("description"),
+            agent_name=task_data.get("agent_name"),
+            status="pending",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+        db.add(task)
+        new_tasks.append(task)
+
+    if new_tasks:
+        db.commit()
+        for task in new_tasks:
+            db.refresh(task)
+            task_dict = {
+                "id": str(task.id),
+                "workflow_id": str(task.workflow_id),
+                "name": task.name,
+                "description": task.description,
+                "status": task.status,
+                "agent_name": task.agent_name,
+                "input_data": task.input_data,
+                "output_data": task.output_data,
+                "created_at": task.created_at.isoformat(),
+                "updated_at": task.updated_at.isoformat(),
+            }
+            publish_event("task_created", task_dict)
+            created_count += 1
+
+    background_tasks.add_task(run_mock_agent_sync, workflow_id)
+
+    return {
+        "message": "Workflow execution started",
+        "workflow_id": str(workflow_id),
+        "tasks_created": created_count,
+    }

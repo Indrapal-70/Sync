@@ -4,31 +4,35 @@ const AGENT_COLORS = {
   programmer: 'bg-[#4f6ef7] text-[#0a0a0a]',
   tester: 'bg-[#a855f7] text-[#0a0a0a]',
   debugger: 'bg-[#f59e0b] text-[#0a0a0a]',
+  researcher: 'bg-[#14b8a6] text-[#0a0a0a]',
+  writer: 'bg-[#f97316] text-[#0a0a0a]',
 }
 
 const AGENT_ICONS = {
   programmer: Code2,
   tester: FlaskConical,
   debugger: Bug,
+  researcher: Bug,
+  writer: Code2,
 }
 
 function TaskKanbanCard({ task }) {
-  const badgeStyle = AGENT_COLORS[task.agentType] || AGENT_COLORS.programmer
-  const Icon = AGENT_ICONS[task.agentType] || Code2
+  const badgeStyle = AGENT_COLORS[task.agent_name] || AGENT_COLORS.programmer
+  const Icon = AGENT_ICONS[task.agent_name] || Code2
 
   return (
     <div className="bg-[#1a1a1a]/70 border border-[#2a2a2a] rounded-lg p-4 hover:border-[#4f6ef7]/40 transition-colors cursor-default">
       <div className="flex justify-between items-start mb-3">
         <span className={`px-2 py-1 rounded text-[10px] uppercase tracking-widest ${badgeStyle}`}>
-          {task.agentType}
+          {task.agent_name || 'unassigned'}
         </span>
         <div className="flex items-center gap-2 text-[#888888]">
-          {task.warning && <AlertTriangle size={16} className="text-[#f59e0b]" />}
+          {task.status === 'failed' && <AlertTriangle size={16} className="text-[#ef4444]" />}
           <BarChart2 size={16} />
         </div>
       </div>
       <h4 className="text-[16px] font-semibold text-[#f0f0f0] mb-2">
-        {task.title}
+        {task.name}
       </h4>
       <p className="text-[13px] text-[#888888] mb-4 line-clamp-2">
         {task.description}

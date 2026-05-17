@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import ReactFlow, {
   Background,
@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import useLogStore from '../store/logStore.js'
+import useTaskStore from '../store/taskStore.js'
 import NodeDetailPanel from '../components/NodeDetailPanel.jsx'
 
 const CronTriggerNode = ({ data }) => (
@@ -114,67 +115,89 @@ const nodeTypes = {
 function NodeBuilderPage() {
   const { id } = useParams()
   const { logs } = useLogStore()
+  const { tasks, fetchTasks } = useTaskStore()
   const [selectedNode, setSelectedNode] = useState(null)
 
-  const initialNodes = useMemo(
-    () => [
-      {
-        id: 'cron-1',
-        type: 'cronTrigger',
-        position: { x: 80, y: 160 },
-        data: {
-          title: 'Data Ingestion',
-          schedule: 'Cron: 0 * * * *',
-          status: 'Success',
-          latency: '1.2s',
-          label: 'Data Ingestion',
-        },
-      },
-      {
-        id: 'processor-1',
-        type: 'dataProcessor',
-        position: { x: 520, y: 260 },
-        data: {
-          title: 'Data Processor',
-          nodeId: 'AGT-882',
-          tokensIn: '4,092',
-          tokensOut: '1,204',
-          statusLabel: 'Running',
-          statusDetail: 'Processing...',
-          log: '> Processed 500 rows. Extracted key entities successfully.',
-          statusTags: [
-            { label: 'Running', className: 'bg-[#0f1a3a] text-[#4f6ef7] border-[#4f6ef7]' },
-            { label: 'TypeErr: b...', className: 'bg-[#2a1010] text-[#ef4444] border-[#ef4444]' },
-            { label: 'Failed', className: 'bg-[#2a1010] text-[#ef4444] border-[#ef4444]' },
-          ],
-          label: 'Data Processor',
-        },
-      },
-    ],
-    [],
+  useEffect(() => {
+    if (id) {
+      fetchTasks(id)
+    }
+  }, [id, fetchTasks])
+
+  const workflowTasks = useMemo(
+    () => tasks.filter((task) => task.workflow_id === id),
+    [tasks, id],
   )
 
-  const initialEdges = useMemo(
-    () => [
-      {
-        id: 'edge-1',
-        source: 'cron-1',
-        target: 'processor-1',
-        type: 'bezier',
-        style: { stroke: '#f0f0f0' },
+  const initialNodes = useMemo(() => {
+    if (!workflowTasks.length) return []
+    return workflowTasks.map((task, index) => ({
+      id: task.id,
+      type: index === 0 ? 'cronTrigger' : 'dataProcessor',
+      position: { x: 80 + index * 260, y: 160 + (index % 2) * 120 },
+      data: {
+        title: task.name,
+        schedule: task.status === 'running' ? 'Live run' : 'Queued',
+        status:
+          task.status === 'completed'
+            ? 'Success'
+            : task.status === 'failed'
+              ? 'Failed'
+              : task.status === 'running'
+                ? 'Running'
+                : 'Pending',
+        latency: task.updated_at ? new Date(task.updated_at).toLocaleTimeString() : '',
+        agent: task.agent_name || 'Unassigned',
+        nodeId: task.agent_name || 'UNASSIGNED',
+        tokensIn: '-',
+        tokensOut: '-',
+        statusLabel: task.status,
+        statusDetail: task.status === 'running' ? 'Processing...' : task.status,
+        log:
+          task.output_data?.error || task.output_data?.result || 'Awaiting output',
+        statusTags: [
+          {
+            label: task.status,
+            className:
+              task.status === 'completed'
+                ? 'bg-[#0f2a1a] text-[#22c55e] border-[#22c55e]'
+                : task.status === 'failed'
+                  ? 'bg-[#2a1010] text-[#ef4444] border-[#ef4444]'
+                  : 'bg-[#0f1a3a] text-[#4f6ef7] border-[#4f6ef7]',
+          },
+        ],
+        label: task.name,
       },
-    ],
-    [],
-  )
+    }))
+  }, [workflowTasks])
 
-  const [nodes, , onNodesChange] = useNodesState(initialNodes)
-  const [edges, , onEdgesChange] = useEdgesState(initialEdges)
+  const initialEdges = useMemo(() => {
+    if (workflowTasks.length <= 1) return []
+    return workflowTasks.slice(1).map((task, index) => ({
+      id: `edge-${index}`,
+      source: workflowTasks[index].id,
+      target: task.id,
+      type: 'bezier',
+      style: { stroke: '#f0f0f0' },
+    }))
+  }, [workflowTasks])
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+
+  useEffect(() => {
+    setNodes(initialNodes)
+  }, [initialNodes, setNodes])
+
+  useEffect(() => {
+    setEdges(initialEdges)
+  }, [initialEdges, setEdges])
 
   const onNodeClick = (_, node) => {
     setSelectedNode(node)
   }
 
-  const panelLogs = logs.filter((entry) => entry.nodeId === selectedNode?.id).slice(-5)
+  const panelLogs = logs.filter((entry) => entry.task_id === selectedNode?.id).slice(-5)
   const panelOpen = Boolean(selectedNode)
 
   return (

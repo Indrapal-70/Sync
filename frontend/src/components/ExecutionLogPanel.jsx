@@ -4,20 +4,20 @@ import { motion } from 'framer-motion'
 import useLogStore from '../store/logStore.js'
 
 const LEVEL_STYLES = {
-  INFO: 'text-[#888888]',
-  SUCCESS: 'text-[#22c55e]',
-  WARN: 'text-[#f59e0b]',
-  EXEC: 'text-[#4f6ef7]',
+  info: 'text-[#888888]',
+  debug: 'text-[#4f6ef7]',
+  warning: 'text-[#f59e0b]',
+  error: 'text-[#ef4444]',
 }
 
 function ExecutionLogPanel({ agentId }) {
   const { logs } = useLogStore()
   const logEndRef = useRef(null)
 
-  const filteredLogs = useMemo(
-    () => logs.filter((entry) => entry.agentId === agentId),
-    [logs, agentId],
-  )
+  const filteredLogs = useMemo(() => {
+    if (!agentId) return logs
+    return logs.filter((entry) => entry.task_id === agentId || entry.workflow_id === agentId)
+  }, [logs, agentId])
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -46,7 +46,7 @@ function ExecutionLogPanel({ agentId }) {
             animate={{ x: 0, opacity: 1 }}
             className="text-[#888888]"
           >
-            <span className="text-[#888888]">[{entry.time}]</span>{' '}
+            <span className="text-[#888888]">[{new Date(entry.created_at).toLocaleTimeString()}]</span>{' '}
             <span className={LEVEL_STYLES[entry.level] || 'text-[#f0f0f0]'}>
               {entry.level}
             </span>
