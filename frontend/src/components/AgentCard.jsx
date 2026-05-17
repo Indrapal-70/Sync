@@ -5,7 +5,8 @@ const TYPE_CONFIG = {
   programmer: { label: 'PROGRAMMER', icon: Code2 },
   tester: { label: 'TESTER', icon: FlaskConical },
   debugger: { label: 'DEBUGGER', icon: Bug },
-  planner: { label: 'PLANNER', icon: Bot },
+  researcher: { label: 'RESEARCHER', icon: Bot },
+  writer: { label: 'WRITER', icon: Code2 },
 }
 
 function AgentCard({ agent }) {

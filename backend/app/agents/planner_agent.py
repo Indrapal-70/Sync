@@ -55,6 +55,11 @@ async def plan_workflow(goal: str) -> list[dict]:
             tasks = json.loads(raw)
             if isinstance(tasks, list):
                 return tasks
+            if isinstance(tasks, dict):
+                if "tasks" in tasks and isinstance(tasks["tasks"], list):
+                    return tasks["tasks"]
+                if {"name", "description", "agent_name"}.issubset(tasks.keys()):
+                    return [tasks]
             return []
 
     except Exception as e:

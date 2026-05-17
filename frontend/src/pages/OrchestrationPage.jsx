@@ -8,7 +8,7 @@ import useLogStore from '../store/logStore.js'
 import AgentCard from '../components/AgentCard.jsx'
 
 function OrchestrationPage() {
-  const { agents, activeCount, totalDeployed } = useAgentStore()
+  const { agents, activeCount, totalDeployed, setAgents } = useAgentStore()
   const { workflows, fetchWorkflows } = useWorkflowStore()
   const { tasks: taskList, fetchTasks } = useTaskStore()
   const { logs } = useLogStore()
@@ -17,6 +17,28 @@ function OrchestrationPage() {
     fetchWorkflows()
     fetchTasks()
   }, [fetchWorkflows, fetchTasks])
+
+  useEffect(() => {
+    const runningTasks = taskList.filter((task) => task.status === 'running')
+    const agentMap = new Map()
+    runningTasks.forEach((task, index) => {
+      const key = task.agent_name || `agent-${index}`
+      if (!agentMap.has(key)) {
+        const inferredType = task.agent_name || 'programmer'
+        agentMap.set(key, {
+          id: key,
+          name: task.agent_name || 'Unassigned',
+          type: inferredType,
+          status: 'running',
+          currentTask: task.name,
+          nodeId: task.workflow_id,
+          cpu: 42,
+          ram: '68%',
+        })
+      }
+    })
+    setAgents(Array.from(agentMap.values()))
+  }, [taskList, setAgents])
 
   const totalWorkflows = workflows.length
   const completedWorkflows = workflows.filter((workflow) => workflow.status === 'completed').length
