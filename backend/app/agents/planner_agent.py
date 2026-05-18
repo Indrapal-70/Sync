@@ -2,83 +2,75 @@ import httpx
 import json
 
 from app.core.config import settings
+from app.agents.model_router import get_model
 
 PLANNER_SYSTEM_PROMPT = """
-You are a workflow planning agent for SYNC, an AI orchestration
-platform. When given a goal, you break it into concrete,
-executable tasks for specialized AI agents.
+You are a master orchestrator inside SYNC, powered by Kimi.
+Decompose the user's goal into 3-6 concrete tasks.
 
-Respond ONLY with a valid JSON array. No explanation. No markdown.
-No code blocks. Just the raw JSON array.
+Return ONLY a raw JSON array:
+[
+    {
+        "name": "short task name",
+        "description": "detailed description",
+        "agent_name": "coder",
+        "priority": 1,
+        "dependencies": []
+    }
+]
 
-Each task object must have exactly these fields:
-{
-  "name": "short task name (max 50 chars)",
-  "description": "what this task does (max 200 chars)",
-  "agent_name": "one of: programmer, tester, debugger, researcher, writer"
-}
-
-Create between 3 and 6 tasks. Make them specific and actionable.
+agent_name must be one of: coder, tester, debugger, reviewer
+Use "coder" for most tasks. Priority is execution order (1 = first).
+dependencies is a list of task names that must complete first.
+No markdown, no extra text.
 """
 
 
 async def plan_workflow(goal: str) -> list[dict]:
     """
-    Send a goal to Ollama/Mistral and get back a task list.
-    Returns list of task dicts or empty list on failure.
+    Send a goal to Ollama/Kimi and get back a task list.
+    Returns list of task dicts or fallback list on failure.
     """
-    prompt = f"Break this goal into tasks: {goal}"
-
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.post(
                 f"{settings.ollama_base_url}/api/generate",
                 json={
-                    "model": settings.ollama_model,
-                    "prompt": f"{PLANNER_SYSTEM_PROMPT}\n\n{prompt}",
+                    "model": get_model("planner"),
+                    "prompt": f"{PLANNER_SYSTEM_PROMPT}\n\nGoal: {goal}",
                     "stream": False,
                     "format": "json",
                 },
             )
             response.raise_for_status()
-            result = response.json()
-            raw = result.get("response", "[]")
-
-            # Clean response in case model wraps in markdown
-            raw = raw.strip()
-            if raw.startswith("```"):
-                raw = raw.split("```")[1]
-                if raw.startswith("json"):
-                    raw = raw[4:]
-            raw = raw.strip()
+            raw = response.json().get("response", "[]")
 
             tasks = json.loads(raw)
-            if isinstance(tasks, list):
+            if isinstance(tasks, list) and tasks:
                 return tasks
-            if isinstance(tasks, dict):
-                if "tasks" in tasks and isinstance(tasks["tasks"], list):
-                    return tasks["tasks"]
-                if {"name", "description", "agent_name"}.issubset(tasks.keys()):
-                    return [tasks]
-            return []
-
     except Exception as e:
         print(f"[Planner] Ollama error: {e}")
-        # Fallback tasks if Ollama fails
-        return [
-            {
-                "name": "Research & Planning",
-                "description": f"Research and plan approach for: {goal}",
-                "agent_name": "researcher",
-            },
-            {
-                "name": "Implementation",
-                "description": "Implement the core solution",
-                "agent_name": "programmer",
-            },
-            {
-                "name": "Testing & Validation",
-                "description": "Test and validate the implementation",
-                "agent_name": "tester",
-            },
-        ]
+
+    return [
+        {
+            "name": "Implement core logic",
+            "description": goal,
+            "agent_name": "coder",
+            "priority": 1,
+            "dependencies": [],
+        },
+        {
+            "name": "Write tests",
+            "description": f"Test: {goal}",
+            "agent_name": "coder",
+            "priority": 2,
+            "dependencies": ["Implement core logic"],
+        },
+        {
+            "name": "Review quality",
+            "description": f"Review: {goal}",
+            "agent_name": "coder",
+            "priority": 3,
+            "dependencies": ["Write tests"],
+        },
+    ]
