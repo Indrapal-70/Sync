@@ -14,6 +14,10 @@ class TaskUpdate(BaseModel):
     status: Optional[str] = None
     output_data: Optional[dict] = None
     agent_name: Optional[str] = None
+    current_agent: Optional[str] = None
+    pipeline_stage: Optional[str] = None
+    retry_count: Optional[int] = None
+    agent_output: Optional[dict] = None
 
 class TaskResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
