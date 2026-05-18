@@ -154,7 +154,9 @@ function WorkflowDAG({ workflow, tasks }) {
       },
     ]
 
-    const taskNodes = (tasks || []).map((task, index) => ({
+    const taskNodes = (tasks || []).map((task, index) => {
+      const agentLabel = task.current_agent || task.agent_name || 'Unassigned'
+      return {
       id: task.id,
       type: 'sequence',
       position: { x: 70 + index * 310, y: 340 },
@@ -163,20 +165,21 @@ function WorkflowDAG({ workflow, tasks }) {
         title: task.name,
         status: task.status === 'completed' ? 'passed' : task.status === 'failed' ? 'failed' : 'pending',
         error: task.status === 'failed' ? 'FAILED' : null,
-        agent: task.agent_name || 'Unassigned',
+        agent: agentLabel,
         meta: task.status.toUpperCase(),
         icon:
-          task.agent_name === 'tester'
+          agentLabel === 'tester'
             ? <Shield size={16} className="text-[#888888]" />
-            : task.agent_name === 'debugger'
+            : agentLabel === 'debugger'
               ? <Bug size={16} className="text-[#888888]" />
-              : task.agent_name === 'reviewer'
+              : agentLabel === 'reviewer'
                 ? <Target size={16} className="text-[#888888]" />
-                : task.agent_name === 'planner'
+                : agentLabel === 'planner'
                   ? <Split size={16} className="text-[#888888]" />
                   : <Database size={16} className="text-[#888888]" />,
       },
-    }))
+    }
+    })
 
     return [...base, ...taskNodes]
   }, [workflow, tasks])
