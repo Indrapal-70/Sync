@@ -31,7 +31,15 @@ def create_task(task_in: TaskCreate, db: Session = Depends(get_db)):
     
     task_dict = TaskResponse.model_validate(task).model_dump(mode='json')
     publish_event("task_created", task_dict)
-    create_log(db, task.workflow_id, f"Task '{task.name}' created", "info", task.id)
+    create_log(
+        db,
+        task.workflow_id,
+        f"Task '{task.name}' created",
+        "info",
+        task.id,
+        agent_name=task.agent_name,
+        pipeline_stage=task.pipeline_stage,
+    )
     
     return task
 
@@ -70,11 +78,35 @@ def update_task(task_id: UUID, task_update: TaskUpdate, db: Session = Depends(ge
     publish_event("task_updated", task_dict)
     
     if status_changed_to == "running":
-        create_log(db, task.workflow_id, f"Task '{task.name}' is now running", "info", task.id)
+        create_log(
+            db,
+            task.workflow_id,
+            f"Task '{task.name}' is now running",
+            "info",
+            task.id,
+            agent_name=task.agent_name,
+            pipeline_stage=task.pipeline_stage,
+        )
     elif status_changed_to == "completed":
-        create_log(db, task.workflow_id, f"Task '{task.name}' completed successfully", "info", task.id)
+        create_log(
+            db,
+            task.workflow_id,
+            f"Task '{task.name}' completed successfully",
+            "info",
+            task.id,
+            agent_name=task.agent_name,
+            pipeline_stage=task.pipeline_stage,
+        )
     elif status_changed_to == "failed":
-        create_log(db, task.workflow_id, f"Task '{task.name}' failed", "error", task.id)
+        create_log(
+            db,
+            task.workflow_id,
+            f"Task '{task.name}' failed",
+            "error",
+            task.id,
+            agent_name=task.agent_name,
+            pipeline_stage=task.pipeline_stage,
+        )
         
     return task
 
