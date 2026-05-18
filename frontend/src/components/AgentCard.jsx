@@ -2,15 +2,15 @@ import { Bot, Bug, Code2, FlaskConical } from 'lucide-react'
 import StatusBadge from './StatusBadge.jsx'
 
 const TYPE_CONFIG = {
-  programmer: { label: 'PROGRAMMER', icon: Code2 },
+  coder: { label: 'CODER', icon: Code2 },
   tester: { label: 'TESTER', icon: FlaskConical },
   debugger: { label: 'DEBUGGER', icon: Bug },
-  researcher: { label: 'RESEARCHER', icon: Bot },
-  writer: { label: 'WRITER', icon: Code2 },
+  reviewer: { label: 'REVIEWER', icon: Code2 },
+  planner: { label: 'PLANNER', icon: Bot },
 }
 
 function AgentCard({ agent }) {
-  const config = TYPE_CONFIG[agent.type] || TYPE_CONFIG.programmer
+  const config = TYPE_CONFIG[agent.type] || TYPE_CONFIG.coder
   const Icon = config.icon
   const isRunning = agent.status === 'running'
 
