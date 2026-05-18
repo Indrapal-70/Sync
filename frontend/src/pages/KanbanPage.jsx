@@ -68,7 +68,7 @@ function KanbanPage() {
             <span className="text-[10px] uppercase tracking-widest text-[#888888] mr-2">
               Agents:
             </span>
-            {['programmer', 'tester', 'debugger'].map((agent) => (
+            {['coder', 'tester', 'debugger', 'reviewer', 'planner'].map((agent) => (
               <button
                 key={agent}
                 type="button"
