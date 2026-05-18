@@ -2,23 +2,23 @@ import { AlertTriangle, BarChart2, Bug, Code2, FlaskConical } from 'lucide-react
 import { PipelineStageIndicator } from './PipelineStageIndicator.tsx'
 
 const AGENT_COLORS = {
-  programmer: 'bg-[#4f6ef7] text-[#0a0a0a]',
-  tester: 'bg-[#a855f7] text-[#0a0a0a]',
+  coder: 'bg-[#4f6ef7] text-[#0a0a0a]',
+  tester: 'bg-[#8b5cf6] text-[#0a0a0a]',
   debugger: 'bg-[#f59e0b] text-[#0a0a0a]',
-  researcher: 'bg-[#14b8a6] text-[#0a0a0a]',
-  writer: 'bg-[#f97316] text-[#0a0a0a]',
+  reviewer: 'bg-[#22c55e] text-[#0a0a0a]',
+  planner: 'bg-[#06b6d4] text-[#0a0a0a]',
 }
 
 const AGENT_ICONS = {
-  programmer: Code2,
+  coder: Code2,
   tester: FlaskConical,
   debugger: Bug,
-  researcher: Bug,
-  writer: Code2,
+  reviewer: Code2,
+  planner: Code2,
 }
 
 function TaskKanbanCard({ task }) {
-  const badgeStyle = AGENT_COLORS[task.agent_name] || AGENT_COLORS.programmer
+  const badgeStyle = AGENT_COLORS[task.agent_name] || AGENT_COLORS.coder
   const Icon = AGENT_ICONS[task.agent_name] || Code2
 
   return (
