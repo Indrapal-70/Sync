@@ -170,7 +170,11 @@ function WorkflowDAG({ workflow, tasks }) {
             ? <Shield size={16} className="text-[#888888]" />
             : task.agent_name === 'debugger'
               ? <Bug size={16} className="text-[#888888]" />
-              : <Database size={16} className="text-[#888888]" />,
+              : task.agent_name === 'reviewer'
+                ? <Target size={16} className="text-[#888888]" />
+                : task.agent_name === 'planner'
+                  ? <Split size={16} className="text-[#888888]" />
+                  : <Database size={16} className="text-[#888888]" />,
       },
     }))
 
