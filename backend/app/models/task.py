@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Column, DateTime, ForeignKey, JSON, String, Text
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 from app.models.base import Base
@@ -19,5 +19,14 @@ class Task(Base):
     agent_name = Column(String, nullable=True)
     input_data = Column(JSON, nullable=True)
     output_data = Column(JSON, nullable=True)
+    subtasks = Column(JSON, nullable=True)
+    current_agent = Column(String, nullable=True)
+    agent_output = Column(JSON, nullable=True)
+    test_results = Column(JSON, nullable=True)
+    review_results = Column(JSON, nullable=True)
+    retry_count = Column(Integer, default=0)
+    max_retries = Column(Integer, default=3)
+    pipeline_stage = Column(String, nullable=True)
+    error_log = Column(JSON, nullable=True)
     created_at = Column(DateTime, nullable=False)
     updated_at = Column(DateTime, nullable=False)
