@@ -159,6 +159,8 @@ async def _run_task_pipeline(task: Task, workflow_id: UUID, db: Session) -> bool
             f"🔁 Review rejected (attempt {review_attempts}): {must_fix}",
             "warning",
             task_id,
+            agent_name="reviewer",
+            pipeline_stage="reviewing",
         )
         context["previous_error"] = str(must_fix)
 
