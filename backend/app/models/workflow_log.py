@@ -16,4 +16,6 @@ class WorkflowLog(Base):
     task_id = Column(PG_UUID(as_uuid=True), ForeignKey("tasks.id"), nullable=True, index=True)
     level = Column(String, nullable=False, default="info")
     message = Column(Text, nullable=False)
+    agent_name = Column(String, nullable=True)
+    pipeline_stage = Column(String, nullable=True)
     created_at = Column(DateTime, nullable=False)
