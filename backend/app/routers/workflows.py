@@ -124,7 +124,20 @@ async def execute_workflow(
         created_tasks.append(task)
         publish_event(
             "task_created",
-            {"id": str(task.id), "name": task.name, "workflow_id": str(workflow_id)},
+            {
+                "id": str(task.id),
+                "name": task.name,
+                "workflow_id": str(workflow_id),
+                "status": task.status,
+                "agent_name": task.agent_name,
+                "input_data": task.input_data,
+                "output_data": task.output_data,
+                "current_agent": task.current_agent,
+                "pipeline_stage": task.pipeline_stage,
+                "retry_count": task.retry_count,
+                "created_at": task.created_at.isoformat(),
+                "updated_at": task.updated_at.isoformat(),
+            },
         )
 
     background_tasks.add_task(run_pipeline_sync, workflow_id)
