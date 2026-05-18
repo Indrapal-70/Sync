@@ -26,6 +26,7 @@ const useWebSocket = () => {
       const event = message.event || ''
       if (event.startsWith('workflow_')) workflowStore.handleWebSocketEvent(message)
       if (event.startsWith('task_')) taskStore.handleWebSocketEvent(message)
+      if (event === 'agent_status_changed') taskStore.handleWebSocketEvent(message)
       if (event.startsWith('log_')) logStore.handleWebSocketEvent(message)
     },
     [workflowStore, taskStore, logStore],
