@@ -1,9 +1,9 @@
 MODEL_MAP = {
-    "planner": "kimi-k2.6",
+    "planner": "kimi-k2.6:cloud",
     "coder": "qwen3-coder-next",
-    "debugger": "deepseek-v4-pro",
-    "reviewer": "deepseek-v4-pro",
-    "utility": "minimax-m2.7",
+    "debugger": "deepseek-v4-pro:cloud",
+    "reviewer": "deepseek-v4-pro:cloud",
+    "utility": "minimax-m2.7:cloud",
 }
 
 FALLBACK_MODEL = "mistral"
