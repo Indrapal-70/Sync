@@ -74,6 +74,24 @@ def ensure_schema() -> None:
 				conn.execute(text("ALTER TABLE tasks ADD COLUMN input_data JSONB"))
 			if "output_data" not in task_cols:
 				conn.execute(text("ALTER TABLE tasks ADD COLUMN output_data JSONB"))
+			if "subtasks" not in task_cols:
+				conn.execute(text("ALTER TABLE tasks ADD COLUMN subtasks JSONB"))
+			if "current_agent" not in task_cols:
+				conn.execute(text("ALTER TABLE tasks ADD COLUMN current_agent VARCHAR"))
+			if "agent_output" not in task_cols:
+				conn.execute(text("ALTER TABLE tasks ADD COLUMN agent_output JSONB"))
+			if "test_results" not in task_cols:
+				conn.execute(text("ALTER TABLE tasks ADD COLUMN test_results JSONB"))
+			if "review_results" not in task_cols:
+				conn.execute(text("ALTER TABLE tasks ADD COLUMN review_results JSONB"))
+			if "retry_count" not in task_cols:
+				conn.execute(text("ALTER TABLE tasks ADD COLUMN retry_count INTEGER DEFAULT 0"))
+			if "max_retries" not in task_cols:
+				conn.execute(text("ALTER TABLE tasks ADD COLUMN max_retries INTEGER DEFAULT 3"))
+			if "pipeline_stage" not in task_cols:
+				conn.execute(text("ALTER TABLE tasks ADD COLUMN pipeline_stage VARCHAR"))
+			if "error_log" not in task_cols:
+				conn.execute(text("ALTER TABLE tasks ADD COLUMN error_log JSONB"))
 			if "created_at" not in task_cols:
 				conn.execute(text("ALTER TABLE tasks ADD COLUMN created_at TIMESTAMP DEFAULT NOW() NOT NULL"))
 			if "updated_at" not in task_cols:
@@ -111,6 +129,10 @@ def ensure_schema() -> None:
 				conn.execute(
 					text("ALTER TABLE workflow_logs ADD COLUMN level VARCHAR DEFAULT 'info' NOT NULL")
 				)
+			if "agent_name" not in log_cols:
+				conn.execute(text("ALTER TABLE workflow_logs ADD COLUMN agent_name VARCHAR"))
+			if "pipeline_stage" not in log_cols:
+				conn.execute(text("ALTER TABLE workflow_logs ADD COLUMN pipeline_stage VARCHAR"))
 			if "created_at" not in log_cols:
 				conn.execute(
 					text("ALTER TABLE workflow_logs ADD COLUMN created_at TIMESTAMP DEFAULT NOW() NOT NULL")
