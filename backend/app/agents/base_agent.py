@@ -22,7 +22,14 @@ class BaseAgent:
 
     def log(self, message: str, level: str = "info") -> None:
         prefix = f"[{self.name.upper()}]"
-        create_log(self.db, self.workflow_id, f"{prefix} {message}", level, self.task_id)
+        create_log(
+            self.db,
+            self.workflow_id,
+            f"{prefix} {message}",
+            level,
+            self.task_id,
+            agent_name=self.name,
+        )
 
     async def call_ollama(self, prompt: str, system: str = "") -> str:
         model = get_model(self.name)
