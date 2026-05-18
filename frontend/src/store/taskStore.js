@@ -57,6 +57,22 @@ const useTaskStore = create((set, get) => ({
         tasks: get().tasks.map((task) => (task.id === payload.id ? { ...task, ...payload } : task)),
       })
     }
+    if (event === 'task_deleted') {
+      set({ tasks: get().tasks.filter((task) => task.id !== payload.id) })
+    }
+    if (event === 'agent_status_changed') {
+      set({
+        tasks: get().tasks.map((task) =>
+          task.id === payload.task_id
+            ? {
+                ...task,
+                current_agent: payload.agent_name,
+                pipeline_stage: payload.pipeline_stage,
+              }
+            : task,
+        ),
+      })
+    }
   },
   getTasksByWorkflow: (workflowId) =>
     get().tasks.filter((task) => task.workflow_id === workflowId),
