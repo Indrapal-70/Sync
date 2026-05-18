@@ -22,12 +22,12 @@ function OrchestrationPage() {
     const runningTasks = taskList.filter((task) => task.status === 'running')
     const agentMap = new Map()
     runningTasks.forEach((task, index) => {
-      const key = task.agent_name || `agent-${index}`
-      if (!agentMap.has(key)) {
-        const inferredType = task.agent_name || 'programmer'
-        agentMap.set(key, {
-          id: key,
-          name: task.agent_name || 'Unassigned',
+      const agentKey = task.current_agent || task.agent_name || `agent-${index}`
+      if (!agentMap.has(agentKey)) {
+        const inferredType = task.current_agent || task.agent_name || 'coder'
+        agentMap.set(agentKey, {
+          id: agentKey,
+          name: agentKey || 'Unassigned',
           type: inferredType,
           status: 'running',
           currentTask: task.name,
