@@ -18,14 +18,15 @@ const AGENT_ICONS = {
 }
 
 function TaskKanbanCard({ task }) {
-  const badgeStyle = AGENT_COLORS[task.agent_name] || AGENT_COLORS.coder
-  const Icon = AGENT_ICONS[task.agent_name] || Code2
+  const activeAgent = task.current_agent || task.agent_name
+  const badgeStyle = AGENT_COLORS[activeAgent] || AGENT_COLORS.coder
+  const Icon = AGENT_ICONS[activeAgent] || Code2
 
   return (
     <div className="bg-[#1a1a1a]/70 border border-[#2a2a2a] rounded-lg p-4 hover:border-[#4f6ef7]/40 transition-colors cursor-default">
       <div className="flex justify-between items-start mb-3">
         <span className={`px-2 py-1 rounded text-[10px] uppercase tracking-widest ${badgeStyle}`}>
-          {task.agent_name || 'unassigned'}
+          {activeAgent || 'unassigned'}
         </span>
         <div className="flex items-center gap-2 text-[#888888]">
           {task.status === 'failed' && <AlertTriangle size={16} className="text-[#ef4444]" />}
