@@ -11,7 +11,9 @@ def create_log(
     workflow_id: UUID,
     message: str,
     level: str = "info",
-    task_id: Optional[UUID] = None
+    task_id: Optional[UUID] = None,
+    agent_name: Optional[str] = None,
+    pipeline_stage: Optional[str] = None,
 ) -> WorkflowLog:
     log = WorkflowLog(
         id=uuid.uuid4(),
@@ -19,6 +21,8 @@ def create_log(
         task_id=task_id,
         level=level,
         message=message,
+        agent_name=agent_name,
+        pipeline_stage=pipeline_stage,
         created_at=datetime.utcnow()
     )
     db.add(log)
@@ -30,6 +34,8 @@ def create_log(
         "task_id": str(log.task_id) if log.task_id else None,
         "level": log.level,
         "message": log.message,
+        "agent_name": log.agent_name,
+        "pipeline_stage": log.pipeline_stage,
         "created_at": log.created_at.isoformat()
     })
     return log
