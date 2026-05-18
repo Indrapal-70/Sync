@@ -24,6 +24,8 @@ def create_log_entry(log_in: LogCreate, db: Session = Depends(get_db)):
         workflow_id=log_in.workflow_id,
         message=log_in.message,
         level=log_in.level,
-        task_id=log_in.task_id
+        task_id=log_in.task_id,
+        agent_name=log_in.agent_name,
+        pipeline_stage=log_in.pipeline_stage,
     )
     return log

@@ -8,6 +8,8 @@ class LogCreate(BaseModel):
     task_id: Optional[UUID] = None
     level: str = "info"
     message: str
+    agent_name: Optional[str] = None
+    pipeline_stage: Optional[str] = None
 
 class LogResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
