@@ -1,4 +1,5 @@
 import { AlertTriangle, BarChart2, Bug, Code2, FlaskConical } from 'lucide-react'
+import { PipelineStageIndicator } from './PipelineStageIndicator.tsx'
 
 const AGENT_COLORS = {
   programmer: 'bg-[#4f6ef7] text-[#0a0a0a]',
@@ -37,6 +38,16 @@ function TaskKanbanCard({ task }) {
       <p className="text-[13px] text-[#888888] mb-4 line-clamp-2">
         {task.description}
       </p>
+      {task.pipeline_stage && (
+        <div className="mb-3">
+          <PipelineStageIndicator
+            pipelineStage={task.pipeline_stage}
+            currentAgent={task.current_agent}
+            retryCount={task.retry_count || 0}
+            mini
+          />
+        </div>
+      )}
       {task.status === 'running' && typeof task.progress === 'number' && (
         <div className="mb-4">
           <div className="flex justify-between text-[12px] text-[#888888] mb-1">
