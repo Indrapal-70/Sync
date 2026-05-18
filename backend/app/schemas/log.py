@@ -16,4 +16,6 @@ class LogResponse(BaseModel):
     task_id: Optional[UUID]
     level: str
     message: str
+    agent_name: Optional[str] = None
+    pipeline_stage: Optional[str] = None
     created_at: datetime
