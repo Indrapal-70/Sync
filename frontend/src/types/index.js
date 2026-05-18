@@ -18,6 +18,10 @@
  * @property {string=} agent_name
  * @property {Object<string, unknown>=} input_data
  * @property {Object<string, unknown>=} output_data
+ * @property {string=} current_agent
+ * @property {string=} pipeline_stage
+ * @property {number=} retry_count
+ * @property {Object<string, unknown>=} agent_output
  * @property {string} created_at
  * @property {string} updated_at
  */
