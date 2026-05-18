@@ -8,7 +8,7 @@ from app.models.task import Task
 from app.schemas.workflow import WorkflowCreate, WorkflowUpdate, WorkflowResponse
 from app.services.redis_client import publish_event
 from app.services.log_service import create_log
-from app.agents.mock_agent import run_mock_agent
+from app.agents.pipeline_orchestrator import run_pipeline
 from app.agents.planner_agent import plan_workflow
 import uuid
 from datetime import datetime
@@ -16,14 +16,14 @@ from datetime import datetime
 router = APIRouter(prefix="/api/workflows", tags=["Workflows"])
 
 
-def run_mock_agent_sync(workflow_id: UUID):
+def run_pipeline_sync(workflow_id: UUID):
     import asyncio
 
     from app.database.session import SessionLocal
 
     db = SessionLocal()
     try:
-        asyncio.run(run_mock_agent(workflow_id, db))
+        asyncio.run(run_pipeline(workflow_id, db))
     finally:
         db.close()
 
@@ -102,46 +102,35 @@ async def execute_workflow(
         raise HTTPException(status_code=404, detail="Workflow not found")
 
     task_plan = await plan_workflow(workflow.description or workflow.name)
-    created_count = 0
-
-    new_tasks = []
-    for task_data in task_plan:
+    created_tasks = []
+    for item in task_plan:
         task = Task(
             id=uuid.uuid4(),
             workflow_id=workflow_id,
-            name=task_data.get("name", "Untitled Task"),
-            description=task_data.get("description"),
-            agent_name=task_data.get("agent_name"),
+            name=item.get("name", "Untitled Task"),
+            description=item.get("description", ""),
+            agent_name=item.get("agent_name", "coder"),
+            input_data={
+                "dependencies": item.get("dependencies", []),
+                "priority": item.get("priority", 1),
+            },
             status="pending",
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
         )
         db.add(task)
-        new_tasks.append(task)
-
-    if new_tasks:
         db.commit()
-        for task in new_tasks:
-            db.refresh(task)
-            task_dict = {
-                "id": str(task.id),
-                "workflow_id": str(task.workflow_id),
-                "name": task.name,
-                "description": task.description,
-                "status": task.status,
-                "agent_name": task.agent_name,
-                "input_data": task.input_data,
-                "output_data": task.output_data,
-                "created_at": task.created_at.isoformat(),
-                "updated_at": task.updated_at.isoformat(),
-            }
-            publish_event("task_created", task_dict)
-            created_count += 1
+        db.refresh(task)
+        created_tasks.append(task)
+        publish_event(
+            "task_created",
+            {"id": str(task.id), "name": task.name, "workflow_id": str(workflow_id)},
+        )
 
-    background_tasks.add_task(run_mock_agent_sync, workflow_id)
+    background_tasks.add_task(run_pipeline_sync, workflow_id)
 
     return {
-        "message": "Workflow execution started",
+        "message": "Pipeline started",
         "workflow_id": str(workflow_id),
-        "tasks_created": created_count,
+        "tasks_created": len(created_tasks),
     }
