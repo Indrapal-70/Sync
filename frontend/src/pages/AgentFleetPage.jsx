@@ -21,30 +21,45 @@ function AgentFleetPage() {
     fetchTasks()
   }, [fetchTasks])
 
-  const runningTasks = useMemo(() => tasks.filter((task) => task.status === 'running'), [tasks])
-  const agentMap = useMemo(() => {
-    const map = new Map()
-    runningTasks.forEach((task, index) => {
-      const key = task.agent_name || `agent-${index}`
-      if (!map.has(key)) {
-        map.set(key, {
-          id: key,
-          name: task.agent_name || 'Unassigned',
-          status: 'running',
-          currentTask: task.name,
-          nodeId: task.workflow_id,
-          resources: { cpu: 42, ramPercent: 68, networkMBs: 12 },
-        })
+  const agentCards = useMemo(() => {
+    const base = [
+      { name: 'coder', label: 'Coder Agent', model: 'qwen3-coder-next' },
+      { name: 'tester', label: 'Tester Agent', model: 'deepseek-v4-pro' },
+      { name: 'debugger', label: 'Debugger Agent', model: 'deepseek-v4-pro' },
+      { name: 'reviewer', label: 'Reviewer Agent', model: 'deepseek-v4-pro' },
+      { name: 'planner', label: 'Planner Agent', model: 'kimi-k2.6' },
+    ]
+
+    return base.map((agent) => {
+      const activeTasks = tasks.filter(
+        (t) => t.current_agent === agent.name && t.status === 'running',
+      )
+      const completedCount = tasks.filter(
+        (t) => t.agent_output?.[agent.name] && t.status === 'completed',
+      ).length
+      const activeTask = activeTasks[0]
+
+      return {
+        id: agent.name,
+        name: agent.name,
+        label: agent.label,
+        model: agent.model,
+        status: activeTasks.length ? 'running' : 'idle',
+        currentTask: activeTask?.name,
+        nodeId: activeTask?.workflow_id || 'n/a',
+        resources: { cpu: 42, ramPercent: 68, networkMBs: 12 },
+        activeTasks,
+        completedCount,
+        currentStage: activeTask?.pipeline_stage,
       }
     })
-    return Array.from(map.values())
-  }, [runningTasks])
+  }, [tasks])
 
   useEffect(() => {
-    if (agentMap.length) {
-      setAgents(agentMap)
+    if (agentCards.length) {
+      setAgents(agentCards)
     }
-  }, [agentMap, setAgents])
+  }, [agentCards, setAgents])
 
   useEffect(() => {
     if (id) {
@@ -52,11 +67,13 @@ function AgentFleetPage() {
     }
   }, [id, selectAgent])
 
-  const activeAgent = selectedAgent || agentMap[0]
-  const agentSubtasks = useMemo(
-    () => tasks.filter((task) => task.agent_name === activeAgent?.name),
-    [tasks, activeAgent],
-  )
+  const activeAgent = selectedAgent || agentCards[0]
+  const agentSubtasks = useMemo(() => {
+    if (!activeAgent) return []
+    return tasks.filter(
+      (task) => task.current_agent === activeAgent.name || task.agent_name === activeAgent.name,
+    )
+  }, [tasks, activeAgent])
 
   if (!activeAgent) {
     return (
@@ -88,6 +105,9 @@ function AgentFleetPage() {
             </div>
             <p className="text-[12px] text-[#888888] font-mono">
               ID: {activeAgent.id} | Node: {activeAgent.nodeId}
+            </p>
+            <p className="text-[11px] text-[#555555] font-mono mt-1">
+              Model: {activeAgent.model} | Stage: {activeAgent.currentStage || 'idle'}
             </p>
           </div>
         </div>
@@ -175,6 +195,11 @@ function AgentFleetPage() {
                   <div>
                     <p className="text-[12px] text-[#f0f0f0]">{task.name}</p>
                     <p className="text-[11px] text-[#888888] mt-1">{task.description}</p>
+                    {task.pipeline_stage && (
+                      <p className="text-[10px] text-[#555555] mt-2 font-mono">
+                        Stage: {task.pipeline_stage}
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}
