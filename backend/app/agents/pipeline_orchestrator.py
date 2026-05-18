@@ -23,7 +23,14 @@ async def run_pipeline(workflow_id: UUID, db: Session):
         return
 
     _set_workflow_status(db, workflow, "running")
-    create_log(db, workflow_id, f"🚀 Pipeline started: {workflow.name}", "info")
+    create_log(
+        db,
+        workflow_id,
+        f"🚀 Pipeline started: {workflow.name}",
+        "info",
+        agent_name="planner",
+        pipeline_stage="planning",
+    )
 
     tasks = (
         db.query(Task)
@@ -55,7 +62,14 @@ async def run_pipeline(workflow_id: UUID, db: Session):
 
     final = "completed" if all_success else "failed"
     _set_workflow_status(db, workflow, final)
-    create_log(db, workflow_id, f"✅ Pipeline {final}: {workflow.name}", "info")
+    create_log(
+        db,
+        workflow_id,
+        f"✅ Pipeline {final}: {workflow.name}",
+        "info",
+        agent_name="planner",
+        pipeline_stage="done",
+    )
 
 
 async def _run_task_pipeline(task: Task, workflow_id: UUID, db: Session) -> bool:
@@ -102,6 +116,8 @@ async def _run_task_pipeline(task: Task, workflow_id: UUID, db: Session) -> bool
                 f"❌ Max debug retries ({MAX_DEBUG_RETRIES}) reached for: {task.name}",
                 "error",
                 task_id,
+                agent_name="debugger",
+                pipeline_stage="debugging_failed",
             )
             break
 
@@ -112,6 +128,8 @@ async def _run_task_pipeline(task: Task, workflow_id: UUID, db: Session) -> bool
             f"🔧 Debug attempt {debug_attempts}/{MAX_DEBUG_RETRIES}: {task.name}",
             "warning",
             task_id,
+            agent_name="debugger",
+            pipeline_stage="debugging",
         )
 
         _set_task(
@@ -212,5 +230,9 @@ def _save_agent_output(db, task, agent_name: str, result: dict):
     outputs = task.agent_output or {}
     outputs[agent_name] = result
     task.agent_output = outputs
+    if agent_name == "tester":
+        task.test_results = result
+    if agent_name == "reviewer":
+        task.review_results = result
     task.updated_at = datetime.utcnow()
     db.commit()
