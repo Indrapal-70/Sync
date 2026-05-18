@@ -10,6 +10,20 @@ const LEVEL_STYLES = {
   error: 'text-[#ef4444]',
 }
 
+const AGENT_COLORS = {
+  CODER: '#4f6ef7',
+  TESTER: '#8b5cf6',
+  DEBUGGER: '#f59e0b',
+  REVIEWER: '#22c55e',
+  PLANNER: '#06b6d4',
+}
+
+function getAgentColor(message) {
+  const match = message.match(/\[([A-Z]+)\]/)
+  if (match) return AGENT_COLORS[match[1]] ?? '#888888'
+  return '#888888'
+}
+
 function ExecutionLogPanel({ agentId }) {
   const { logs } = useLogStore()
   const logEndRef = useRef(null)
@@ -50,7 +64,7 @@ function ExecutionLogPanel({ agentId }) {
             <span className={LEVEL_STYLES[entry.level] || 'text-[#f0f0f0]'}>
               {entry.level}
             </span>
-            : <span className="text-[#f0f0f0]">{entry.message}</span>
+            : <span style={{ color: getAgentColor(entry.message) }}>{entry.message}</span>
           </motion.div>
         ))}
         <div ref={logEndRef} />
