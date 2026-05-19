@@ -1,5 +1,4 @@
 from pydantic_settings import BaseSettings
-from typing import Optional
 
 class Settings(BaseSettings):
     # Database
@@ -11,10 +10,16 @@ class Settings(BaseSettings):
     # Ollama (free local AI)
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "mistral"
+    thinker_model: str = "mistral"
+    builder_model: str = "deepseek-coder:6.7b"
+    fallback_model: str = "mistral"
+    thinker_timeout: int = 90
+    builder_timeout: int = 120
     
     # App
     app_env: str = "development"
     secret_key: str = "your-secret-key-change-this"
+    review_pass_threshold: int = 65
 
     class Config:
         env_file = ".env"
