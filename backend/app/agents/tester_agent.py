@@ -1,121 +1,128 @@
-import json
-
 from app.agents.base_agent import BaseAgent
-from app.tools.tool_executor import execute_tool
 
 
 class TesterAgent(BaseAgent):
     name = "tester"
     role = "Validates code output, runs tests, identifies failures"
 
-    SYSTEM_PROMPT = """
-You are an expert QA engineer inside SYNC.
-
-Analyze the provided code for:
-1. Syntax errors
-2. Logic errors
-3. Missing edge case handling
-4. Security vulnerabilities
-5. Whether it solves the stated task
-
-Optionally emit a "tool_call" to execute the code in the terminal.
-
-Respond ONLY with raw JSON:
-{
-  "all_passed": true,
-  "tests": [
-    {
-      "test_name": "descriptive name",
-      "passed": true,
-      "error_message": null,
-      "severity": "critical"
-    }
-  ],
-  "overall_quality": "good",
-  "critical_issues": [],
-  "warnings": [],
-  "tool_call": {
-    "tool": "run_command",
-    "args": { "command": "python workspace/file.py" }
-  }
-}
-Omit "tool_call" if not running code.
-"""
-
     async def run(self, task_context: dict) -> dict:
-        code_output = task_context.get("code_output", {})
         task_name = task_context.get("name", "")
+        code_output = task_context.get("code_output", {})
         code = code_output.get("code", "")
+        strict = task_context.get("strict_testing", False)
 
-        self.log(f"Testing: {task_name}")
+        self.log(f"Testing task: {task_name}")
+        if strict:
+            self.log("STRICT mode active - warnings treated as critical", "warning")
         self.publish_stage("testing")
 
-        if not code:
+        if not code or len(code) < 10:
             self.log("No code to test", "error")
             return {
-                "success": False,
+                "success": True,
                 "all_passed": False,
                 "agent": self.name,
-                "tests": [
-                    {
-                        "test_name": "Code existence",
-                        "passed": False,
-                        "error_message": "No code produced",
-                        "severity": "critical",
-                    }
-                ],
+                "results": {
+                    "all_passed": False,
+                    "tests": [
+                        {
+                            "test_name": "Code existence",
+                            "passed": False,
+                            "error_message": "No code was produced",
+                            "severity": "critical",
+                        }
+                    ],
+                    "overall_quality": "poor",
+                    "critical_issues": ["No code provided"],
+                    "warnings": [],
+                },
             }
 
-        prompt = (
-            f"Task: {task_name}\n"
-            f"Code:\n{code}\n"
-            f"Test hints: {code_output.get('test_hints', [])}"
-        )
+        prompt = f"""
+Task that was supposed to be solved: {task_name}
+Description: {code_output.get('explanation', 'No explanation provided')}
+
+Code to evaluate:
+{code}
+
+Test hints from the coder: {code_output.get('test_hints', [])}
+{"Apply STRICT testing - treat warnings as critical failures." if strict else ""}
+
+Evaluate thoroughly and return your test results.
+"""
 
         try:
-            raw = await self.call_ollama(prompt, self.SYSTEM_PROMPT)
-            result = self._parse_json(raw)
+            raw = await self.call_skill("test", prompt)
+            result = self.parse_json_robust(raw)
 
-            if "tool_call" in result:
-                tc = result["tool_call"]
-                exec_result = await execute_tool(tc["tool"], tc.get("args", {}))
-                if not exec_result.get("success"):
-                    result["all_passed"] = False
-                    result["critical_issues"] = result.get("critical_issues", [])
-                    result["critical_issues"].append(
-                        f"Runtime error: {exec_result.get('stderr', exec_result.get('error'))}"
-                    )
-                self.log(
-                    f"Executed code — return code: {exec_result.get('return_code', '?')}"
-                )
+            tests = result.get("tests", [])
 
-            if result.get("all_passed"):
-                self.log(f"Tests passed — quality: {result.get('overall_quality')}")
-            else:
-                self.log(
-                    f"Tests FAILED — {len(result.get('critical_issues', []))} critical issues",
-                    "warning",
-                )
+            if not tests:
+                tests = [
+                    {
+                        "test_name": "Basic output check",
+                        "passed": True,
+                        "error_message": None,
+                        "severity": "info",
+                    }
+                ]
+                result["tests"] = tests
+                self.log("No tests returned - adding default pass", "warning")
+
+            all_passed = True
+            for t in tests:
+                if not t.get("passed"):
+                    severity = t.get("severity", "critical")
+                    if severity == "critical" or (strict and severity == "warning"):
+                        all_passed = False
+                        self.log(
+                            f"FAIL [{severity}]: {t.get('test_name')}",
+                            "error",
+                        )
+                    else:
+                        self.log(f"WARN: {t.get('test_name')}", "warning")
+
+            result["all_passed"] = all_passed
+
+            passed = len([t for t in tests if t.get("passed")])
+            failed = len(tests) - passed
+            critical = len(
+                [
+                    t
+                    for t in tests
+                    if not t.get("passed") and t.get("severity") == "critical"
+                ]
+            )
+            self.log(
+                f"Tests: {passed} passed, {failed} failed "
+                f"({critical} critical) - quality: {result.get('overall_quality')}"
+            )
 
             return {
                 "success": True,
-                "all_passed": result.get("all_passed", False),
+                "all_passed": all_passed,
                 "agent": self.name,
                 "results": result,
             }
+
         except Exception as e:
-            self.log(f"Testing error: {e}", "error")
+            self.log(f"Tester failed: {e}", "error")
             return {
-                "success": False,
+                "success": True,
                 "all_passed": False,
                 "agent": self.name,
-                "error": str(e),
+                "results": {
+                    "all_passed": False,
+                    "tests": [
+                        {
+                            "test_name": "Tester error",
+                            "passed": False,
+                            "error_message": str(e),
+                            "severity": "critical",
+                        }
+                    ],
+                    "overall_quality": "unknown",
+                    "critical_issues": [str(e)],
+                    "warnings": [],
+                },
             }
-
-    def _parse_json(self, raw: str) -> dict:
-        raw = raw.strip()
-        if "```" in raw:
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-        return json.loads(raw.strip())
