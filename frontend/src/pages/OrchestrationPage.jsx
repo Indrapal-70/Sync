@@ -5,13 +5,21 @@ import useAgentStore from '../store/agentStore.js'
 import useWorkflowStore from '../store/workflowStore.js'
 import useTaskStore from '../store/taskStore.js'
 import useLogStore from '../store/logStore.js'
+import useModelStore from '../store/modelStore.js'
 import AgentCard from '../components/AgentCard.jsx'
+import { Cpu } from 'lucide-react'
+
+const MODEL_CONFIG = {
+  'mistral:latest': {},
+  'deepseek-coder:6.7b': {}
+}
 
 function OrchestrationPage() {
   const { agents, activeCount, totalDeployed, setAgents } = useAgentStore()
   const { workflows, fetchWorkflows } = useWorkflowStore()
   const { tasks: taskList, fetchTasks } = useTaskStore()
   const { logs } = useLogStore()
+  const { modelHealth, allModelsOk, fallbackActive } = useModelStore()
 
   useEffect(() => {
     fetchWorkflows()
@@ -49,11 +57,23 @@ function OrchestrationPage() {
     () => workflows.filter((workflow) => workflow.status === 'failed').length,
     [workflows],
   )
-  const isHealthy = failedWorkflows === 0
   const filteredAlerts = useMemo(
     () => logs.filter((log) => ['warning', 'error'].includes(log.level)),
     [logs],
   )
+  
+  // Calculate system health
+  const recentErrorLogs = logs.filter(
+    log => log.level === 'error' && (Date.now() - new Date(log.created_at).getTime()) < 5 * 60 * 1000
+  )
+  
+  const onlineModels = Object.values(modelHealth || {}).filter(m => m.available).length
+  const totalModels = Object.keys(MODEL_CONFIG).length
+  
+  const isOptimal = allModelsOk && recentErrorLogs.length === 0
+  const isError = !allModelsOk && onlineModels === 0
+  const isDegraded = (onlineModels > 0 && onlineModels < totalModels) || fallbackActive
+
   const totalWorkflowsCount = workflows.length
 
   return (
@@ -74,15 +94,27 @@ function OrchestrationPage() {
               orchestration metrics in real-time.
             </p>
           </div>
-          {isHealthy && (
+          {isOptimal && (
             <div className="flex items-center gap-2 text-[#22c55e]">
               <CheckCircle2 size={16} />
-              <span className="text-[10px] uppercase tracking-widest">System Optimal</span>
+              <span className="text-[10px] uppercase tracking-widest text-[#22c55e]">System Optimal</span>
+            </div>
+          )}
+          {isError && (
+            <div className="flex items-center gap-2 text-[#ef4444]">
+              <Cpu size={16} />
+              <span className="text-[10px] uppercase tracking-widest text-[#ef4444]">System Error</span>
+            </div>
+          )}
+          {isDegraded && !isError && (
+            <div className="flex items-center gap-2 text-[#f59e0b]">
+              <Cpu size={16} />
+              <span className="text-[10px] uppercase tracking-widest text-[#f59e0b]">Degraded</span>
             </div>
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
               <span className="text-[10px] uppercase tracking-widest text-[#888888]">
@@ -144,6 +176,39 @@ function OrchestrationPage() {
                 <div
                   key={idx}
                   className="w-1/6 bg-[#2a2a2a] h-full rounded-t-sm"
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Models Online Card */}
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-[10px] uppercase tracking-widest text-[#888888]">
+                Models Online
+              </span>
+              <Cpu size={18} className={
+                onlineModels === totalModels ? "text-[#22c55e]" : 
+                onlineModels > 0 ? "text-[#f59e0b]" : "text-[#ef4444]"
+              } />
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-[32px] text-[#f0f0f0] font-semibold">
+                {onlineModels} / {totalModels}
+              </span>
+              {fallbackActive && (
+                <span className="text-[10px] text-[#f59e0b] ml-2 uppercase tracking-widest">
+                  Fallback
+                </span>
+              )}
+            </div>
+            <div className="mt-4 flex gap-1">
+              {Array.from({ length: totalModels }).map((_, index) => (
+                <div
+                  key={index}
+                  className={`h-1 flex-1 rounded-full ${
+                    index < onlineModels ? (onlineModels === totalModels ? 'bg-[#22c55e]' : 'bg-[#f59e0b]') : 'bg-[#2a2a2a]'
+                  }`}
                 />
               ))}
             </div>
