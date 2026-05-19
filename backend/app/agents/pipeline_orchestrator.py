@@ -79,8 +79,8 @@ async def _run_task_pipeline(task: Task, workflow_id: UUID, db: Session) -> bool
         "description": task.description,
         "input_data": task.input_data or {},
         "previous_error": None,
-        "code_output": None,
-        "test_results": None,
+        "code_output": {},
+        "test_results": {},
     }
 
     _set_task(db, task, status="running", current_agent="coder", pipeline_stage="coding")
