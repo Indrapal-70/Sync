@@ -614,16 +614,6 @@ This project is licensed under the MIT License — see `LICENSE` file for detail
 - ✅ Workflow versioning and rollback
 - ✅ Advanced monitoring & analytics dashboard
 
----
-
-**Built with ❤️ for orchestrating AI workflows at scale.**
-
-```
-  ____  _   _  ___  _   _  ____
- / ___|| | | |/ _ \| | | |/ ___|
- \___ \| | | | | | | | | | |
-  ___) | |_| | |_| | |_| | |___
- |____/ \___/ \___/ \___/ \____|
 
  SYNC v0.3.0 — Real-Time Multi-Agent Orchestration
 ```
