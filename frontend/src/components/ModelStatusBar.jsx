@@ -27,7 +27,7 @@ function secondsAgo(isoString) {
 }
 
 function ModelStatusBar() {
-  const { modelHealth, allModelsOk, isLoading, lastChecked, fallbackActive, fetchModelHealth } =
+  const { modelHealth, allModelsOk, isLoading, lastChecked, fallbackActive, fetchModelHealth, activeSkills } =
     useModelStore()
   const [tick, setTick] = useState(0)
 
@@ -130,21 +130,27 @@ function ModelStatusBar() {
               <div style={{ fontSize: 9, color: '#888888', marginBottom: 4 }}>{config.role}</div>
               {/* Skill pills */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                {config.skills.map(skill => (
-                  <span
-                    key={skill}
-                    style={{
-                      fontSize: 9,
-                      background: '#1a1a1a',
-                      border: '1px solid #2a2a2a',
-                      borderRadius: 3,
-                      padding: '1px 5px',
-                      color: '#888888',
-                    }}
-                  >
-                    {skill}
-                  </span>
-                ))}
+                {config.skills.map(skill => {
+                  const isActive = activeSkills?.has(skill)
+                  return (
+                    <span
+                      key={skill}
+                      style={{
+                        fontSize: 9,
+                        background: isActive ? `${config.color}22` : '#1a1a1a',
+                        border: isActive ? `1px solid ${config.color}` : '1px solid #2a2a2a',
+                        borderRadius: 3,
+                        padding: '1px 5px',
+                        color: isActive ? config.color : '#888888',
+                        boxShadow: isActive ? `0 0 8px ${config.color}44` : 'none',
+                        transition: 'all 0.3s ease',
+                        animation: isActive ? 'pulse 2s ease-in-out infinite' : 'none'
+                      }}
+                    >
+                      {skill}
+                    </span>
+                  )
+                })}
               </div>
             </div>
 

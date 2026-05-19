@@ -68,7 +68,7 @@ const useModelStore = create((set, get) => ({
     if (event === 'skill_reassigned') {
       set(state => ({
         skills: state.skills.map(s =>
-          s.name === payload.skill_name
+          s.name === payload.skill
             ? { ...s, model: payload.new_model, model_key: payload.new_model_key }
             : s
         )
@@ -80,14 +80,14 @@ const useModelStore = create((set, get) => ({
     if (event === 'skill_called') {
       set(state => {
         const next = new Set(state.activeSkills)
-        next.add(payload?.skill_name)
+        next.add(payload?.skill)
         return { activeSkills: next }
       })
     }
     if (event === 'skill_completed' || event === 'skill_failed') {
       set(state => {
         const next = new Set(state.activeSkills)
-        next.delete(payload?.skill_name)
+        next.delete(payload?.skill)
         return { activeSkills: next }
       })
       get().fetchSkillStats()
