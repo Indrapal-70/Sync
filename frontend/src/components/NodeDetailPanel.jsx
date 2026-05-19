@@ -1,7 +1,17 @@
-import { ChevronDown, X } from 'lucide-react'
+import { ChevronDown, X, Cpu } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 
+const getModelDisplayName = (fullName) => {
+  if (!fullName) return 'unknown'
+  if (fullName.includes('deepseek')) return 'deepseek-coder'
+  if (fullName.includes('mistral')) return 'mistral'
+  return fullName.split(':')[0]
+}
+
 function NodeDetailPanel({ node, logs, onClose }) {
+  const agentOutputs = node?.data?.agentOutput || {}
+  const modelSummary = node?.data?.modelSummary || {}
+
   return (
     <AnimatePresence>
       {node && (
@@ -84,7 +94,56 @@ function NodeDetailPanel({ node, logs, onClose }) {
                   ))}
                 </div>
               </details>
+
+              {/* Agent Outputs */}
+              {Object.entries(agentOutputs).map(([agentName, output]) => {
+                const modelUsed = output?.model_used
+                return (
+                  <details key={agentName} className="group bg-[#111111] rounded-lg border border-[#2a2a2a] overflow-hidden">
+                    <summary className="flex items-center justify-between p-3 cursor-pointer bg-[#202020]/40 hover:bg-[#202020]/70 transition-colors">
+                      <div className="flex flex-col">
+                        <span className="text-[12px] uppercase tracking-widest text-[#f0f0f0]">
+                          {agentName} Output
+                        </span>
+                        {modelUsed && (
+                          <span className="text-[9px] text-[#888888] uppercase tracking-widest mt-0.5 flex items-center gap-1">
+                            <Cpu size={10} /> via {getModelDisplayName(modelUsed)}
+                          </span>
+                        )}
+                      </div>
+                      <ChevronDown size={16} className="text-[#888888] group-open:rotate-180 transition-transform" />
+                    </summary>
+                    <div className="p-3 border-t border-[#2a2a2a] bg-[#0f0f0f] font-mono text-[11px] space-y-1">
+                      <pre className="text-[#888888] whitespace-pre-wrap overflow-x-auto text-[10px]">
+                        {JSON.stringify(output, null, 2)}
+                      </pre>
+                    </div>
+                  </details>
+                )
+              })}
             </div>
+
+            {/* Model Summary */}
+            {Object.keys(modelSummary).length > 0 && (
+              <div className="mt-4 pt-4 border-t border-[#2a2a2a]">
+                <h4 className="text-[10px] uppercase tracking-widest text-[#888888] mb-3">
+                  Task Model Summary
+                </h4>
+                <div className="space-y-2">
+                  {Object.entries(modelSummary).map(([modelName, count]) => (
+                    <div key={modelName} className="flex justify-between items-center bg-[#111111] p-2 rounded border border-[#2a2a2a]">
+                      <span className="text-[11px] text-[#f0f0f0] flex items-center gap-2">
+                        <Cpu size={12} className={modelName.includes('deepseek') ? 'text-[#4f6ef7]' : 'text-[#8b5cf6]'} />
+                        {getModelDisplayName(modelName)}
+                      </span>
+                      <span className="text-[10px] font-mono text-[#888888]">
+                        {count} {count === 1 ? 'call' : 'calls'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <div className="p-4 border-t border-[#2a2a2a] bg-[#1a1a1a] flex gap-3">
             <button className="flex-1 bg-[#2a2a2a] text-[#f0f0f0] hover:bg-[#3a3a3a] text-[12px] uppercase tracking-widest py-2 rounded border border-[#2a2a2a]">

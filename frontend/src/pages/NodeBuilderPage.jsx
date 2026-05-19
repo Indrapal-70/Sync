@@ -155,6 +155,8 @@ function NodeBuilderPage() {
         statusDetail: task.status === 'running' ? 'Processing...' : task.status,
         log:
           task.output_data?.error || task.output_data?.result || 'Awaiting output',
+        agentOutput: task.agent_output,
+        modelSummary: task.output_data?.model_summary,
         statusTags: [
           {
             label: task.status,
