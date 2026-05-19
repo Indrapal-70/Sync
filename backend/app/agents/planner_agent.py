@@ -1,76 +1,66 @@
-import httpx
-import json
-
-from app.core.config import settings
-from app.agents.model_router import get_model
-
-PLANNER_SYSTEM_PROMPT = """
-You are a master orchestrator inside SYNC, powered by Kimi.
-Decompose the user's goal into 3-6 concrete tasks.
-
-Return ONLY a raw JSON array:
-[
-    {
-        "name": "short task name",
-        "description": "detailed description",
-        "agent_name": "coder",
-        "priority": 1,
-        "dependencies": []
-    }
-]
-
-agent_name must be one of: coder, tester, debugger, reviewer
-Use "coder" for most tasks. Priority is execution order (1 = first).
-dependencies is a list of task names that must complete first.
-No markdown, no extra text.
-"""
+from app.skills.skill_router import skill_router
+from app.agents.base_agent import BaseAgent
 
 
-async def plan_workflow(goal: str) -> list[dict]:
+async def plan_workflow(goal: str, workflow_id=None, db=None) -> list[dict]:
     """
-    Send a goal to Ollama/Kimi and get back a task list.
-    Returns list of task dicts or fallback list on failure.
+    Use the 'plan' skill (mistral) to break a goal into tasks.
+    Returns list of task dicts or fallback list on any failure.
     """
+    print(f"[Planner] Planning workflow for goal: {goal[:80]}...")
+
+    prompt = f"""
+    Project goal: {goal}
+
+    Break this into specific, executable tasks for our AI agents.
+    Remember: agents available are coder, tester, debugger, reviewer.
+    """
+
     try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            response = await client.post(
-                f"{settings.ollama_base_url}/api/generate",
-                json={
-                    "model": get_model("planner"),
-                    "prompt": f"{PLANNER_SYSTEM_PROMPT}\n\nGoal: {goal}",
-                    "stream": False,
-                    "format": "json",
-                },
-            )
-            response.raise_for_status()
-            raw = response.json().get("response", "[]")
+        raw = await skill_router.call(
+            skill_name="plan",
+            prompt=prompt,
+        )
 
-            tasks = json.loads(raw)
-            if isinstance(tasks, list) and tasks:
-                return tasks
+        result = BaseAgent.parse_json_robust(raw)
+
+        if isinstance(result, list) and len(result) > 0:
+            print(f"[Planner] Generated {len(result)} tasks")
+            return result
+
+        print("[Planner] Response was not a valid task list")
+        return _fallback_tasks(goal)
+
     except Exception as e:
-        print(f"[Planner] Ollama error: {e}")
+        print(f"[Planner] Failed: {e} - using fallback tasks")
+        return _fallback_tasks(goal)
 
+
+def _fallback_tasks(goal: str) -> list[dict]:
+    """Return 3 basic fallback tasks when planner fails."""
     return [
         {
-            "name": "Implement core logic",
-            "description": goal,
+            "name": "Research and Design",
+            "description": f"Research approach and design solution for: {goal}",
             "agent_name": "coder",
             "priority": 1,
+            "estimated_complexity": "medium",
             "dependencies": [],
         },
         {
-            "name": "Write tests",
-            "description": f"Test: {goal}",
+            "name": "Implementation",
+            "description": "Implement the designed solution",
             "agent_name": "coder",
             "priority": 2,
-            "dependencies": ["Implement core logic"],
+            "estimated_complexity": "medium",
+            "dependencies": [],
         },
         {
-            "name": "Review quality",
-            "description": f"Review: {goal}",
-            "agent_name": "coder",
+            "name": "Testing and Validation",
+            "description": "Test and validate the implementation",
+            "agent_name": "tester",
             "priority": 3,
-            "dependencies": ["Write tests"],
+            "estimated_complexity": "low",
+            "dependencies": [],
         },
     ]
