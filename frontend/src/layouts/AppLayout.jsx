@@ -43,8 +43,8 @@ function AppLayout() {
       <aside className="hidden md:flex flex-col h-screen sticky left-0 top-0 py-6 bg-[#111111] border-r border-[#2a2a2a] w-[280px] shrink-0">
         <div className="px-6 mb-8">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-full bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center overflow-hidden">
-              <span className="text-[#4f6ef7] font-semibold">S</span>
+            <div className="w-10 h-10 rounded-xl bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center overflow-hidden">
+              <img src="/logo.png" alt="SYNC Logo" className="w-full h-full object-cover" />
             </div>
             <div>
               <h2 className="text-[18px] font-semibold">Sync</h2>
