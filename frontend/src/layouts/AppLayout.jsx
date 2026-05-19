@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   Activity,
@@ -10,6 +11,8 @@ import {
   Settings,
   SlidersHorizontal,
 } from 'lucide-react'
+import ModelStatusBar from '../components/ModelStatusBar'
+import useModelStore from '../store/modelStore'
 
 const navItems = [
   { label: 'Orchestration', icon: LayoutDashboard, to: '/orchestration' },
@@ -26,6 +29,14 @@ const footerItems = [
 
 function AppLayout() {
   const location = useLocation()
+  const fetchAll = useModelStore(state => state.fetchAll)
+  const fetchModelHealth = useModelStore(state => state.fetchModelHealth)
+
+  useEffect(() => {
+    fetchAll()
+    const interval = setInterval(fetchModelHealth, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-[#f0f0f0] flex">
@@ -66,6 +77,7 @@ function AppLayout() {
             )
           })}
         </nav>
+        <ModelStatusBar />
         <div className="mt-auto px-4 pb-4 border-t border-[#2a2a2a] pt-4">
           <div className="space-y-1 text-[12px] uppercase tracking-widest">
             {footerItems.map((item) => {

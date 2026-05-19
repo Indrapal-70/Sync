@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import useWorkflowStore from '../store/workflowStore.js'
 import useTaskStore from '../store/taskStore.js'
 import useLogStore from '../store/logStore.js'
+import useModelStore from '../store/modelStore.js'
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000'
 
@@ -28,6 +29,14 @@ const useWebSocket = () => {
       if (event.startsWith('task_')) taskStore.handleWebSocketEvent(message)
       if (event === 'agent_status_changed') taskStore.handleWebSocketEvent(message)
       if (event.startsWith('log_')) logStore.handleWebSocketEvent(message)
+      // Model / skill events
+      const modelEvents = [
+        'skill_called', 'skill_completed', 'skill_failed',
+        'model_fallback_used', 'skill_reassigned'
+      ]
+      if (modelEvents.includes(event)) {
+        useModelStore.getState().handleWebSocketEvent(message)
+      }
     },
     [workflowStore, taskStore, logStore],
   )
