@@ -1,9 +1,10 @@
 import { motion } from 'framer-motion'
 import { useEffect, useMemo } from 'react'
-import { CheckCircle2, Clock, Loader2, Pause, RefreshCcw, Settings2 } from 'lucide-react'
+import { CheckCircle2, Clock, Loader2, Pause, RefreshCcw, Settings2, Cpu, Code2 } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import useAgentStore from '../store/agentStore.js'
 import useTaskStore from '../store/taskStore.js'
+import useModelStore from '../store/modelStore.js'
 import ExecutionLogPanel from '../components/ExecutionLogPanel.jsx'
 
 function getBarColor(value) {
@@ -16,18 +17,26 @@ function AgentFleetPage() {
   const { id } = useParams()
   const { selectedAgent, selectAgent, setAgents } = useAgentStore()
   const { tasks, fetchTasks } = useTaskStore()
+  const { modelHealth, skillStats, skills, fetchModelHealth } = useModelStore()
 
   useEffect(() => {
     fetchTasks()
   }, [fetchTasks])
 
+  const getAgentModel = (agentType) => {
+    const builderAgents = ['coder', 'tester']
+    return builderAgents.includes(agentType)
+      ? 'deepseek-coder:6.7b'
+      : 'mistral:latest'
+  }
+
   const agentCards = useMemo(() => {
     const base = [
-      { name: 'coder', label: 'Coder Agent', model: 'qwen3-coder-next' },
-      { name: 'tester', label: 'Tester Agent', model: 'deepseek-v4-pro' },
-      { name: 'debugger', label: 'Debugger Agent', model: 'deepseek-v4-pro' },
-      { name: 'reviewer', label: 'Reviewer Agent', model: 'deepseek-v4-pro' },
-      { name: 'planner', label: 'Planner Agent', model: 'kimi-k2.6' },
+      { name: 'coder', label: 'Coder Agent', model: getAgentModel('coder') },
+      { name: 'tester', label: 'Tester Agent', model: getAgentModel('tester') },
+      { name: 'debugger', label: 'Debugger Agent', model: getAgentModel('debugger') },
+      { name: 'reviewer', label: 'Reviewer Agent', model: getAgentModel('reviewer') },
+      { name: 'planner', label: 'Planner Agent', model: getAgentModel('planner') },
     ]
 
     return base.map((agent) => {
@@ -81,13 +90,142 @@ function AgentFleetPage() {
     )
   }
 
+  const thinkerStatus = modelHealth['mistral:latest']
+  const builderStatus = modelHealth['deepseek-coder:6.7b']
+  const planStats = skillStats['plan'] || {}
+  const builderStats = skillStats['code'] || {} // Just as an example or fallback if needed
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className="p-4 md:p-8 h-[calc(100vh-64px)] flex flex-col"
+      className="p-4 md:p-8 flex flex-col gap-6"
     >
+      {/* Model Status Section */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-[18px] text-[#f0f0f0] font-semibold">Model Status</h2>
+          <button 
+            onClick={fetchModelHealth}
+            className="text-[12px] text-[#888888] hover:text-[#f0f0f0] flex items-center gap-1 uppercase tracking-widest border border-[#2a2a2a] px-3 py-1 rounded bg-[#1a1a1a]"
+          >
+            <RefreshCcw size={12} /> Refresh
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Card 1 — The Thinker */}
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-5 flex flex-col">
+            <div className="flex justify-between items-start mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-[#2a2a2a] rounded-lg">
+                  <Cpu size={20} className="text-[#8b5cf6]" />
+                </div>
+                <div>
+                  <h3 className="text-[14px] font-semibold text-[#f0f0f0]">mistral:latest</h3>
+                  <p className="text-[11px] text-[#888888]">The Thinker</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 bg-[#2a2a2a]/50 px-2 py-1 rounded border border-[#2a2a2a]">
+                <span className={`w-2 h-2 rounded-full ${thinkerStatus?.available ? 'bg-[#22c55e] animate-pulse' : 'bg-[#ef4444]'}`} />
+                <span className="text-[10px] uppercase tracking-widest text-[#f0f0f0]">
+                  {thinkerStatus?.available ? 'Online' : 'Offline'}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              {['plan', 'debug', 'review'].map(s => (
+                <span key={s} className="px-2 py-0.5 bg-[#8b5cf6]/10 border border-[#8b5cf6]/20 text-[#8b5cf6] text-[10px] rounded">
+                  {s}
+                </span>
+              ))}
+            </div>
+            <div className="mt-auto pt-4 border-t border-[#2a2a2a] flex justify-between items-center text-[12px]">
+              <span className="text-[#888888]">Handles reasoning, planning and review</span>
+              <span className="text-[#f0f0f0] font-mono">
+                {planStats.avg_ms ? `Avg ${(planStats.avg_ms / 1000).toFixed(1)}s` : '--'}
+              </span>
+            </div>
+          </div>
+
+          {/* Card 2 — The Builder */}
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-5 flex flex-col">
+            <div className="flex justify-between items-start mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-[#2a2a2a] rounded-lg">
+                  <Code2 size={20} className="text-[#4f6ef7]" />
+                </div>
+                <div>
+                  <h3 className="text-[14px] font-semibold text-[#f0f0f0]">deepseek-coder:6.7b</h3>
+                  <p className="text-[11px] text-[#888888]">The Builder</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 bg-[#2a2a2a]/50 px-2 py-1 rounded border border-[#2a2a2a]">
+                <span className={`w-2 h-2 rounded-full ${builderStatus?.available ? 'bg-[#22c55e] animate-pulse' : 'bg-[#ef4444]'}`} />
+                <span className="text-[10px] uppercase tracking-widest text-[#f0f0f0]">
+                  {builderStatus?.available ? 'Online' : 'Offline'}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              {['code', 'test'].map(s => (
+                <span key={s} className="px-2 py-0.5 bg-[#4f6ef7]/10 border border-[#4f6ef7]/20 text-[#4f6ef7] text-[10px] rounded">
+                  {s}
+                </span>
+              ))}
+            </div>
+            <div className="mt-auto pt-4 border-t border-[#2a2a2a] flex justify-between items-center text-[12px]">
+              <span className="text-[#888888]">Handles code generation and testing</span>
+              <span className="text-[#f0f0f0] font-mono">
+                {builderStats.avg_ms ? `Avg ${(builderStats.avg_ms / 1000).toFixed(1)}s` : '--'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Skill Performance Section */}
+      <section>
+        <h2 className="text-[18px] text-[#f0f0f0] font-semibold mb-4">Skill Performance</h2>
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl overflow-hidden">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-[#111111] border-b border-[#2a2a2a]">
+                <th className="py-3 px-4 text-[#888888] text-xs uppercase tracking-widest font-medium">Skill</th>
+                <th className="py-3 px-4 text-[#888888] text-xs uppercase tracking-widest font-medium">Model</th>
+                <th className="py-3 px-4 text-[#888888] text-xs uppercase tracking-widest font-medium text-right">Total Calls</th>
+                <th className="py-3 px-4 text-[#888888] text-xs uppercase tracking-widest font-medium text-right">Avg Response</th>
+                <th className="py-3 px-4 text-[#888888] text-xs uppercase tracking-widest font-medium text-right">Error Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              {['plan', 'code', 'test', 'debug', 'review'].map((skillName) => {
+                const sData = skillStats[skillName] || { total_calls: 0, avg_ms: 0, error_rate: 0 }
+                const skillDef = skills?.find(s => s.name === skillName)
+                const modelName = skillDef ? skillDef.model : '--'
+                return (
+                  <tr key={skillName} className="border-b border-[#2a2a2a] hover:bg-[#1a1a1a]/50 transition-colors">
+                    <td className="py-3 px-4 text-[13px] text-[#f0f0f0] font-medium">{skillName}</td>
+                    <td className="py-3 px-4 text-[13px] text-[#888888] font-mono">{modelName}</td>
+                    <td className="py-3 px-4 text-[13px] text-[#f0f0f0] text-right font-mono">
+                      {sData.total_calls}
+                    </td>
+                    <td className="py-3 px-4 text-[13px] text-[#888888] text-right font-mono">
+                      {sData.total_calls > 0 ? `${(sData.avg_ms / 1000).toFixed(1)}s` : '--'}
+                    </td>
+                    <td className="py-3 px-4 text-[13px] text-[#888888] text-right font-mono">
+                      {sData.total_calls > 0 ? `${(sData.error_rate * 100).toFixed(1)}%` : '--'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Active Agent Section */}
+      <h2 className="text-[18px] text-[#f0f0f0] font-semibold mt-4">Active Agent Status</h2>
       <div className="glass-panel bg-[#1a1a1a]/70 border border-[#2a2a2a] rounded-xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-t-4 border-t-[#4f6ef7]">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-[#2a2a2a] flex items-center justify-center border border-[#2a2a2a]">
