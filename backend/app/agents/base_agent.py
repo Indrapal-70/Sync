@@ -1,14 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+import json
 
-import httpx
-
-from app.core.config import settings
+from app.skills.skill_router import skill_router
 from app.services.log_service import create_log
 from app.services.redis_client import publish_event
-from app.agents.model_router import get_model
 
 
 class BaseAgent:
@@ -31,20 +28,28 @@ class BaseAgent:
             agent_name=self.name,
         )
 
-    async def call_ollama(self, prompt: str, system: str = "") -> str:
-        model = get_model(self.name)
-        full_prompt = f"{system}\n\n{prompt}" if system else prompt
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            response = await client.post(
-                f"{settings.ollama_base_url}/api/generate",
-                json={
-                    "model": model,
-                    "prompt": full_prompt,
-                    "stream": False,
-                },
+    async def call_skill(
+        self, skill_name: str, prompt: str, extra_context: str = ""
+    ) -> str:
+        """
+        Call a named skill via the SkillRouter.
+        Logs timing and errors automatically.
+        """
+        self.log(f"Calling skill: {skill_name}", "debug")
+        try:
+            result = await skill_router.call(
+                skill_name=skill_name,
+                prompt=prompt,
+                extra_context=extra_context,
             )
-            response.raise_for_status()
-            return response.json().get("response", "")
+            self.log(f"Skill '{skill_name}' returned response", "debug")
+            return result
+        except Exception as e:
+            self.log(
+                f"Skill '{skill_name}' failed: {type(e).__name__}: {e}",
+                "error",
+            )
+            raise
 
     def publish_stage(self, stage: str) -> None:
         publish_event(
@@ -53,8 +58,49 @@ class BaseAgent:
                 "task_id": str(self.task_id),
                 "workflow_id": str(self.workflow_id),
                 "agent_name": self.name,
-                "model": get_model(self.name),
+                "model": "dynamic",
                 "pipeline_stage": stage,
                 "timestamp": datetime.utcnow().isoformat(),
             },
         )
+
+    @staticmethod
+    def parse_json_robust(raw: str) -> any:
+        """
+        Try multiple strategies to parse JSON from model response.
+        Returns parsed dict/list or raises ValueError.
+        """
+        raw = raw.strip()
+
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            pass
+
+        cleaned = raw
+        if "```" in cleaned:
+            parts = cleaned.split("```")
+            for part in parts:
+                part = part.strip()
+                if part.startswith("json"):
+                    part = part[4:].strip()
+                try:
+                    return json.loads(part)
+                except json.JSONDecodeError:
+                    continue
+
+        try:
+            start = raw.index("{")
+            end = raw.rindex("}") + 1
+            return json.loads(raw[start:end])
+        except (ValueError, json.JSONDecodeError):
+            pass
+
+        try:
+            start = raw.index("[")
+            end = raw.rindex("]") + 1
+            return json.loads(raw[start:end])
+        except (ValueError, json.JSONDecodeError):
+            pass
+
+        raise ValueError(f"Could not parse JSON from response: {raw[:200]}")
