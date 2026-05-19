@@ -1,6 +1,8 @@
 import asyncio
 from datetime import datetime
 from uuid import UUID
+from app.core.config import settings
+from uuid import UUID
 
 from sqlalchemy.orm import Session
 
@@ -16,6 +18,10 @@ from app.services.redis_client import publish_event
 MAX_DEBUG_RETRIES = 3
 MAX_REVIEW_RETRIES = 2
 
+def _get_model_for_agent(agent_name: str) -> str:
+    if agent_name in ["coder", "tester"]:
+        return settings.builder_model
+    return settings.thinker_model
 
 async def run_pipeline(workflow_id: UUID, db: Session):
     workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
@@ -87,6 +93,8 @@ async def _run_task_pipeline(task: Task, workflow_id: UUID, db: Session) -> bool
 
     coder = CoderAgent(db, workflow_id, task_id)
     coder_result = await coder.run(context)
+    coder_result["model_used"] = _get_model_for_agent("coder")
+    create_log(db, workflow_id, f"[CODER] Completed via {coder_result['model_used']}", "debug", task_id)
     _save_agent_output(db, task, "coder", coder_result)
 
     if not coder_result["success"]:
@@ -102,6 +110,8 @@ async def _run_task_pipeline(task: Task, workflow_id: UUID, db: Session) -> bool
         _set_task(db, task, current_agent="tester", pipeline_stage="testing")
         tester = TesterAgent(db, workflow_id, task_id)
         test_result = await tester.run(context)
+        test_result["model_used"] = _get_model_for_agent("tester")
+        create_log(db, workflow_id, f"[TESTER] Completed via {test_result['model_used']}", "debug", task_id)
         context["test_results"] = test_result
         _save_agent_output(db, task, "tester", test_result)
 
@@ -141,6 +151,8 @@ async def _run_task_pipeline(task: Task, workflow_id: UUID, db: Session) -> bool
         )
         debugger = DebuggerAgent(db, workflow_id, task_id)
         debug_result = await debugger.run(context)
+        debug_result["model_used"] = _get_model_for_agent("debugger")
+        create_log(db, workflow_id, f"[DEBUGGER] Completed via {debug_result['model_used']}", "debug", task_id)
         _save_agent_output(db, task, "debugger", debug_result)
 
         if debug_result["success"]:
@@ -160,6 +172,8 @@ async def _run_task_pipeline(task: Task, workflow_id: UUID, db: Session) -> bool
         _set_task(db, task, current_agent="reviewer", pipeline_stage="reviewing")
         reviewer = ReviewerAgent(db, workflow_id, task_id)
         review_result = await reviewer.run(context)
+        review_result["model_used"] = _get_model_for_agent("reviewer")
+        create_log(db, workflow_id, f"[REVIEWER] Completed via {review_result['model_used']}", "debug", task_id)
         _save_agent_output(db, task, "reviewer", review_result)
 
         if review_result.get("approved"):
@@ -185,18 +199,36 @@ async def _run_task_pipeline(task: Task, workflow_id: UUID, db: Session) -> bool
         _set_task(db, task, current_agent="coder", pipeline_stage="coding_revision")
         coder = CoderAgent(db, workflow_id, task_id)
         coder_result = await coder.run(context)
+        coder_result["model_used"] = _get_model_for_agent("coder")
+        create_log(db, workflow_id, f"[CODER] Completed via {coder_result['model_used']}", "debug", task_id)
         if coder_result["success"]:
             context["code_output"] = coder_result["output"]
 
+    _finalize_task(db, task, context)
+    return review_passed
+
+def _finalize_task(db, task, context):
+    model_summary = {}
+    if task.agent_output:
+        for output in task.agent_output.values():
+            if isinstance(output, dict) and "model_used" in output:
+                m = output["model_used"]
+                model_summary[m] = model_summary.get(m, 0) + 1
+    
+    out_data = context.get("code_output", {})
+    if not isinstance(out_data, dict):
+        out_data = {"raw": out_data}
+    out_data["model_summary"] = model_summary
+    
     _set_task(
         db,
         task,
         status="completed",
         current_agent=None,
         pipeline_stage="done",
-        output_data=context.get("code_output"),
+        output_data=out_data,
+        model_summary=model_summary
     )
-    return review_passed
 
 
 def _set_workflow_status(db, workflow, status: str):
@@ -212,18 +244,19 @@ def _set_task(db, task, **kwargs):
             setattr(task, k, v)
     task.updated_at = datetime.utcnow()
     db.commit()
-    publish_event(
-        "task_updated",
-        {
-            "id": str(task.id),
-            "workflow_id": str(task.workflow_id),
-            "status": task.status,
-            "current_agent": task.current_agent,
-            "pipeline_stage": task.pipeline_stage,
-            "retry_count": task.retry_count,
-            "name": task.name,
-        },
-    )
+    payload = {
+        "id": str(task.id),
+        "workflow_id": str(task.workflow_id),
+        "status": task.status,
+        "current_agent": task.current_agent,
+        "pipeline_stage": task.pipeline_stage,
+        "retry_count": task.retry_count,
+        "name": task.name,
+    }
+    if kwargs.get("model_summary"):
+        payload["model_summary"] = kwargs["model_summary"]
+    
+    publish_event("task_updated", payload)
 
 
 def _save_agent_output(db, task, agent_name: str, result: dict):

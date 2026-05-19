@@ -3,6 +3,7 @@ from datetime import datetime
 
 from app.core.config import settings
 from app.skills.skill_definitions import get_skill
+from app.services.redis_client import publish_event
 
 
 class SkillRouter:
@@ -47,6 +48,11 @@ class SkillRouter:
         start = datetime.utcnow()
         self.call_count[skill_name] = self.call_count.get(skill_name, 0) + 1
 
+        publish_event(
+            "skill_called",
+            {"skill": skill_name, "model": model, "timestamp": start.isoformat()},
+        )
+
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
                 response = await client.post(
@@ -75,9 +81,21 @@ class SkillRouter:
                     f"[SkillRouter] skill={skill_name} "
                     f"model={model} duration={duration_ms}ms"
                 )
+                publish_event(
+                    "skill_completed",
+                    {
+                        "skill": skill_name,
+                        "model": model,
+                        "duration_ms": duration_ms,
+                    },
+                )
                 return result
 
         except httpx.TimeoutException:
+            publish_event(
+                "skill_failed",
+                {"skill": skill_name, "model": model, "error": "timeout"},
+            )
             self.error_count[skill_name] = (
                 self.error_count.get(skill_name, 0) + 1
             )
@@ -92,6 +110,10 @@ class SkillRouter:
             raise
 
         except Exception as e:
+            publish_event(
+                "skill_failed",
+                {"skill": skill_name, "model": model, "error": str(e)},
+            )
             self.error_count[skill_name] = (
                 self.error_count.get(skill_name, 0) + 1
             )
