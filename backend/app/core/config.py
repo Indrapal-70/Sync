@@ -9,10 +9,10 @@ class Settings(BaseSettings):
     
     # Ollama (free local AI)
     ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "mistral"
-    thinker_model: str = "mistral"
+    ollama_model: str = "mistral:latest"
+    thinker_model: str = "mistral:latest"
     builder_model: str = "deepseek-coder:6.7b"
-    fallback_model: str = "mistral"
+    fallback_model: str = "mistral:latest"
     thinker_timeout: int = 90
     builder_timeout: int = 120
     
