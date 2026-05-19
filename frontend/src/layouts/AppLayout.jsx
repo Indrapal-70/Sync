@@ -99,7 +99,10 @@ function AppLayout() {
 
       <div className="flex-1 min-w-0 flex flex-col">
         <header className="h-16 px-4 md:px-6 border-b border-[#2a2a2a] bg-[#0a0a0a]/80 backdrop-blur-xl sticky top-0 z-40 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center overflow-hidden md:hidden">
+              <img src="/logo.png" alt="SYNC Logo" className="w-full h-full object-cover" />
+            </div>
             <span className="font-semibold text-[18px] md:hidden">Sync</span>
           </div>
           <div className="flex items-center gap-3">
