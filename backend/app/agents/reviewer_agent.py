@@ -2,6 +2,11 @@ from app.agents.base_agent import BaseAgent
 from app.core.config import settings
 from app.services.redis_client import publish_event
 
+
+class ReviewerAgent(BaseAgent):
+    name = "reviewer"
+    role = "Reviews code quality and approves or rejects"
+
     async def run(self, task_context: dict) -> dict:
         task_name = task_context.get("name", "")
         code = task_context.get("code_output", {}).get("code", "")
@@ -11,14 +16,14 @@ from app.services.redis_client import publish_event
         self.publish_stage("reviewing")
 
         prompt = f"""
-    Task that was completed: {task_name}
-    Code to review for quality:
+Task that was completed: {task_name}
+Code to review for quality:
 
-    {code}
+{code}
 
-    Apply the scoring guide from your instructions.
-    Approve if score >= {threshold} and no blockers exist.
-    """
+Apply the scoring guide from your instructions.
+Approve if score >= {threshold} and no blockers exist.
+"""
 
         try:
             raw = await self.call_skill("review", prompt)

@@ -4,8 +4,8 @@ from app.agents.base_agent import BaseAgent
 
 
 class DebuggerAgent(BaseAgent):
-        name = "debugger"
-        role = "Analyzes test failures and produces fixed code"
+    name = "debugger"
+    role = "Analyzes test failures and produces fixed code"
 
     async def run(self, task_context: dict) -> dict:
         task_name = task_context.get("name", "")
