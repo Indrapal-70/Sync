@@ -9,4 +9,7 @@ export const modelService = {
 
   getStats: () =>
     api.get('/api/models/stats').then(r => r.data),
+
+  getConfig: () =>
+    api.get('/api/models/config').then(r => r.data),
 }

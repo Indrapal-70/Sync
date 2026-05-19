@@ -10,6 +10,7 @@ const useModelStore = create((set, get) => ({
   lastChecked: null,
   fallbackActive: false,
   activeSkills: new Set(),
+  config: null,
 
   fetchModelHealth: async () => {
     try {
@@ -42,12 +43,22 @@ const useModelStore = create((set, get) => ({
     }
   },
 
+  fetchConfig: async () => {
+    try {
+      const data = await modelService.getConfig()
+      set({ config: data })
+    } catch (e) {
+      console.error('[ModelStore] Config fetch failed:', e)
+    }
+  },
+
   fetchAll: async () => {
     set({ isLoading: true })
     await Promise.all([
       get().fetchModelHealth(),
       get().fetchSkills(),
       get().fetchSkillStats(),
+      get().fetchConfig(),
     ])
     set({ isLoading: false })
   },
