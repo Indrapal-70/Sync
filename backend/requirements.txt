@@ -1,13 +1,34 @@
+# Core web framework
 fastapi
 uvicorn[standard]
+
+# Database
 sqlalchemy
 psycopg2-binary
-redis
-pydantic
-pydantic-settings
-python-dotenv
-websockets
-httpx
 alembic
+
+# Async DB drivers
 asyncpg
 aioredis
+
+# Redis
+redis
+
+# HTTP client (Ollama calls)
+httpx
+
+# Data validation
+pydantic
+pydantic-settings
+
+# Environment
+python-dotenv
+
+# WebSockets
+websockets
+
+# System metrics (Phase 6 - dashboard)
+psutil
+
+# GPU metrics (Phase 6 - VRAM monitoring, optional - install manually if pynvml not available)
+# pynvml
