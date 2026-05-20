@@ -3,22 +3,23 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT))
 
 from app.agents.model_router import get_model
 
 
-class ModelRouterTests(unittest.TestCase):
-    def test_model_mapping(self):
-        self.assertEqual(get_model("planner"), "kimi-k2.6:cloud")
-        self.assertEqual(get_model("coder"), "qwen3-coder-next")
-        self.assertEqual(get_model("debugger"), "deepseek-v4-pro:cloud")
-        self.assertEqual(get_model("reviewer"), "deepseek-v4-pro:cloud")
-        self.assertEqual(get_model("utility"), "minimax-m2.7:cloud")
+class TestModelRouter(unittest.TestCase):
 
-    def test_model_fallback(self):
-        self.assertEqual(get_model("unknown"), "mistral")
+    def test_known_roles(self):
+        self.assertEqual(get_model("planner"),  "mistral:latest")
+        self.assertEqual(get_model("coder"),    "deepseek-coder:6.7b")
+        self.assertEqual(get_model("tester"),   "deepseek-coder:6.7b")
+        self.assertEqual(get_model("debugger"), "mistral:latest")
+        self.assertEqual(get_model("reviewer"), "mistral:latest")
+
+    def test_fallback(self):
+        self.assertEqual(get_model("unknown"), "mistral:latest")
+        self.assertEqual(get_model(""),        "mistral:latest")
 
 
 if __name__ == "__main__":

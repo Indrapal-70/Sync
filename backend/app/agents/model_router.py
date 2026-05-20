@@ -1,12 +1,13 @@
 MODEL_MAP = {
-    "planner": "kimi-k2.6:cloud",
-    "coder": "qwen3-coder-next",
-    "debugger": "deepseek-v4-pro:cloud",
-    "reviewer": "deepseek-v4-pro:cloud",
-    "utility": "minimax-m2.7:cloud",
+    "planner":  "mistral:latest",
+    "coder":    "deepseek-coder:6.7b",
+    "tester":   "deepseek-coder:6.7b",
+    "debugger": "mistral:latest",
+    "reviewer": "mistral:latest",
+    "utility":  "mistral:latest",
 }
 
-FALLBACK_MODEL = "mistral"
+FALLBACK_MODEL = "mistral:latest"
 
 
 def get_model(agent_role: str) -> str:

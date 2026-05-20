@@ -1,4 +1,5 @@
 import httpx
+import time
 
 from app.core.config import settings
 
@@ -11,21 +12,21 @@ REQUIRED_MODELS = [
 
 async def check_model_available(model_name: str) -> dict:
     """
-    Send a minimal test prompt to verify a model is loaded and responds.
-    Returns dict with keys: model, available, response_ms, error
+    Send a minimal test prompt to verify a model responds.
+    Uses keep_alive=0 to unload model immediately after check,
+    freeing RAM for the next model.
     """
-    import time
-
     start = time.time()
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
                 f"{settings.ollama_base_url}/api/generate",
                 json={
                     "model": model_name,
-                    "prompt": "Reply with the single word: ready",
+                    "prompt": "hi",
                     "stream": False,
-                    "options": {"num_predict": 5},
+                    "keep_alive": 0,
+                    "options": {"num_predict": 3},
                 },
             )
             response.raise_for_status()
@@ -48,14 +49,21 @@ async def check_model_available(model_name: str) -> dict:
 
 async def check_all_models() -> dict:
     """
-    Check all required models. Returns full health report.
-    Called on FastAPI startup.
+    Check each model SEQUENTIALLY (not parallel) to avoid
+    loading both into RAM at the same time.
+    16GB RAM cannot hold both models simultaneously.
     """
-    import asyncio
+    results = []
 
-    results = await asyncio.gather(
-        *[check_model_available(m) for m in REQUIRED_MODELS]
-    )
+    for model_name in REQUIRED_MODELS:
+        print(f"[ModelHealth] Checking {model_name}...")
+        result = await check_model_available(model_name)
+        status = "OK" if result["available"] else "UNAVAILABLE"
+        print(f"[ModelHealth] {model_name}: {status} ({result['response_ms']}ms)")
+        if not result["available"]:
+            print(f"[ModelHealth] Error: {result['error']}")
+        results.append(result)
+
     all_ok = all(r["available"] for r in results)
 
     report = {
@@ -63,18 +71,12 @@ async def check_all_models() -> dict:
         "models": {r["model"]: r for r in results},
     }
 
-    for r in results:
-        status = "OK" if r["available"] else "UNAVAILABLE"
-        print(f"[ModelHealth] {r['model']}: {status} ({r['response_ms']}ms)")
-
     if not all_ok:
         unavailable = [r["model"] for r in results if not r["available"]]
-        print(
-            "[ModelHealth] WARNING: These models are unavailable: "
-            f"{unavailable}"
-        )
-        print(f"[ModelHealth] Fallback model: {settings.fallback_model}")
-        print("[ModelHealth] Pipeline will use fallback for unavailable models.")
+        print(f"[ModelHealth] WARNING: Unavailable models: {unavailable}")
+        print(f"[ModelHealth] Fallback active: {settings.fallback_model}")
+    else:
+        print("[ModelHealth] All models OK — pipeline ready")
 
     return report
 
