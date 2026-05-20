@@ -10,6 +10,11 @@ SKILLS = {
         "temperature": 0.7,
         "output_format": "json",
         "description": "Break a goal into executable tasks",
+        # P6-05 — RetryConfig
+        "max_retries": 2,
+        "retry_delay_s": 2,
+        "backoff_factor": 1.5,
+        "fallback_on_fail": True,
         "system_prompt": """
 You are a senior engineering project planner inside SYNC,
 an AI orchestration platform. When given a goal or project
@@ -46,6 +51,11 @@ Create between 3 and 7 tasks. Be specific and actionable.
         "temperature": 0.2,
         "output_format": "json",
         "description": "Write clean, working code for a task",
+        # P6-05 — RetryConfig
+        "max_retries": 2,
+        "retry_delay_s": 5,
+        "backoff_factor": 2.0,
+        "fallback_on_fail": True,
         "system_prompt": """
 You are an expert software engineer inside SYNC.
 Your only job is to write clean, working, complete code
@@ -78,6 +88,11 @@ No markdown fences. Raw JSON only.
         "temperature": 0.1,
         "output_format": "json",
         "description": "Validate code for correctness and quality",
+        # P6-05 — RetryConfig
+        "max_retries": 2,
+        "retry_delay_s": 5,
+        "backoff_factor": 2.0,
+        "fallback_on_fail": True,
         "system_prompt": """
 You are an expert QA engineer inside SYNC.
 You receive code written by a Coder agent and must
@@ -124,6 +139,11 @@ all_passed = true ONLY if zero critical failures exist.
         "temperature": 0.3,
         "output_format": "json",
         "description": "Analyze failures and produce fixed code",
+        # P6-05 — RetryConfig
+        "max_retries": 1,
+        "retry_delay_s": 3,
+        "backoff_factor": 1.5,
+        "fallback_on_fail": True,
         "system_prompt": """
 You are an expert debugging engineer inside SYNC.
 You receive code that failed testing, along with the
@@ -157,6 +177,11 @@ Respond ONLY with raw JSON. No markdown. No explanation.
         "temperature": 0.4,
         "output_format": "json",
         "description": "Review code quality and approve or reject",
+        # P6-05 — RetryConfig
+        "max_retries": 1,
+        "retry_delay_s": 2,
+        "backoff_factor": 1.5,
+        "fallback_on_fail": False,
         "system_prompt": """
 You are a senior engineering lead inside SYNC.
 You review code that has already passed automated testing.
@@ -210,6 +235,8 @@ def list_skills() -> list[dict]:
             "model_key": s["model_key"],
             "description": s["description"],
             "output_format": s["output_format"],
+            "max_retries": s.get("max_retries", 1),
+            "fallback_on_fail": s.get("fallback_on_fail", False),
         }
         for s in SKILLS.values()
     ]
