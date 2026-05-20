@@ -1,8 +1,10 @@
+import asyncio
+import time
 import httpx
 from datetime import datetime
 
 from app.core.config import settings
-from app.skills.skill_definitions import get_skill
+from app.skills.skill_definitions import SKILLS, get_skill
 from app.services.redis_client import publish_event
 
 
@@ -14,9 +16,52 @@ class SkillRouter:
 
     def __init__(self):
         self.base_url = settings.ollama_base_url
+        # Use the module-level SKILLS dict directly so reassignments persist in-memory
+        self.skills = SKILLS
         self.call_count = {}
         self.error_count = {}
         self.total_ms = {}
+
+    # ─────────────────────────────────────────────────────────────────
+    # DB persistence helpers (P6-02)
+    # ─────────────────────────────────────────────────────────────────
+
+    async def load_assignments_from_db(self, db):
+        """Called on startup — loads any saved assignments into memory."""
+        from app.models.skill_assignment import SkillAssignment
+        rows = db.query(SkillAssignment).all()
+        for row in rows:
+            if row.skill_name in self.skills:
+                self.skills[row.skill_name]["model_key"] = row.model_key
+                self.skills[row.skill_name]["model"]     = row.model_name
+        print(f"[SkillRouter] Loaded {len(rows)} assignment(s) from DB")
+
+    async def save_assignment_to_db(self, db, skill_name: str, model_key: str, model_name: str):
+        """Called after every reassign — upsert into skill_assignments."""
+        from app.models.skill_assignment import SkillAssignment
+        from sqlalchemy.dialects.postgresql import insert
+        from sqlalchemy.sql import func
+
+        stmt = insert(SkillAssignment).values(
+            skill_name=skill_name,
+            model_key=model_key,
+            model_name=model_name,
+            updated_by="api",
+        ).on_conflict_do_update(
+            index_elements=["skill_name"],
+            set_={
+                "model_key":  model_key,
+                "model_name": model_name,
+                "updated_at": func.now(),
+                "updated_by": "api",
+            },
+        )
+        db.execute(stmt)
+        db.commit()
+
+    # ─────────────────────────────────────────────────────────────────
+    # Core call path
+    # ─────────────────────────────────────────────────────────────────
 
     async def call(self, skill_name: str, prompt: str, extra_context: str = "") -> str:
         """
