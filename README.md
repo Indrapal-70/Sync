@@ -8,11 +8,11 @@
 
 SYNC is a production-ready orchestration platform that:
 
-- **Plans workflows** using Ollama/Mistral LLM to break down user goals into actionable tasks
-- **Executes tasks** with mock agents that simulate real AI work with realistic delays and progress
-- **Streams everything live** via Redis Pub/Sub → WebSocket to React frontend
-- **Persists data** in PostgreSQL with real-time log aggregation
-- **Provides a polished UI** with 5 feature-rich pages: Orchestration Dashboard, Workflows Kanban, Workflow Details, Agent Fleet Monitor, and Node Builder
+- **Plans workflows** using **Mistral** (The Thinker) to break down user goals into actionable tasks.
+- **Executes tasks** with a fleet of specialized AI agents (Coder, Tester, Debugger, Reviewer) powered by **DeepSeek-Coder** (The Builder) and Mistral.
+- **Streams everything live** via Redis Pub/Sub → WebSocket to React frontend, with real-time model health monitoring.
+- **Persists data** in PostgreSQL with real-time log aggregation and performance stats.
+- **Provides a polished UI** with 5 feature-rich pages: Orchestration Dashboard, Workflows Kanban, Workflow Details (with Agent Output Drawers), Agent Fleet Monitor, and Node Builder.
 
 ---
 
@@ -24,7 +24,7 @@ SYNC is a production-ready orchestration platform that:
 - FastAPI (async Python web framework)
 - PostgreSQL (relational database)
 - Redis (pub/sub messaging & caching)
-- Ollama + Mistral (local LLM for planning)
+- Ollama + Mistral (Thinker) & DeepSeek-Coder (Builder)
 - SQLAlchemy (ORM)
 
 **Frontend:**
@@ -57,11 +57,11 @@ Ollama/Mistral plans tasks (or fallback tasks)
          ↓
 Tasks saved to PostgreSQL
          ↓
-Mock agent runs tasks sequentially
+Real agents (Coder, Tester, Debugger, Reviewer) execute an E2E pipeline
          ↓
-Each status update → Redis → WebSocket → Frontend
+Each status update & skill call → Redis → WebSocket → Frontend
          ↓
-User sees live progress on DAG canvas
+User sees live progress, agent outputs, and model health
 ```
 
 ---
@@ -76,9 +76,9 @@ Install these before running SYNC:
 - **Node.js 18+** ([download](https://nodejs.org/))
 - **Git** ([download](https://git-scm.com/))
 
-### Optional (but recommended for best experience)
-- **Ollama** ([download](https://ollama.ai)) — for local LLM
-- **VS Code** with extensions: Python, Pylance, ES7+ React/Redux snippets
+### Required AI Engine
+- **Ollama** ([download](https://ollama.ai)) — required for running the local agents.
+- Run `ollama pull mistral:latest` and `ollama pull deepseek-coder:6.7b` before starting execution.
 
 ---
 
@@ -101,7 +101,7 @@ docker compose up -d
 **What this starts:**
 - PostgreSQL on `localhost:5432`
 - Redis on `localhost:6379`
-- Ollama on `localhost:11434` (with Mistral model)
+- Ollama on `localhost:11434` (with Mistral and DeepSeek-Coder models)
 
 Verify all services are running:
 ```bash
@@ -201,8 +201,8 @@ You should see:
 - Watch the magic:
   - ✨ Ollama/Mistral plans tasks from your description
   - 📋 Tasks appear in the Kanban board
-  - 🔄 Mock agent runs each task (2-5 seconds each)
-  - 📊 DAG canvas shows real-time progress
+  - 🔄 Real LLM agents execute a full Coder → Tester → Debugger → Reviewer pipeline
+  - 📊 DAG canvas shows real-time progress and live model health indicators
   - 📝 Logs stream live to the log panel
 
 ### 4. Monitor Execution
@@ -464,7 +464,7 @@ created_at (Time)   Timestamp
 ### 3. **Workflow Details**
    - Directed Acyclic Graph (DAG) of tasks
    - Live progress visualization
-   - Detailed task information panel
+   - Node Builder UI and Detailed Task Information Drawer (with specific Agent outputs and model usage summary)
    - Real-time log stream with filtering
 
 ### 4. **Agent Fleet Monitor**
@@ -494,14 +494,14 @@ created_at (Time)   Timestamp
    ↓
 5. Tasks created in DB (status="pending")
    ↓
-6. Mock agent starts running tasks sequentially
+6. Pipeline Orchestrator routes task to the Coder Agent
    ↓
 7. For each task:
    a. Status changes to "running"
-   b. Simulated work (2-5 seconds)
-   c. 85% success / 15% failure
+   b. Agent Pipeline Executes: Coder → Tester → (if failed) Debugger → Reviewer
+   c. Real Python code generation, execution, and review via local LLMs
    d. Status changes to "completed" or "failed"
-   e. Output data stored
+   e. Agent outputs and model usage summaries stored
    ↓
 8. All task updates stream via WebSocket
    ↓
@@ -604,16 +604,20 @@ This project is licensed under the MIT License — see `LICENSE` file for detail
 
 ---
 
-## 🎉 What's Next?
+## 🎉 Features Implemented
 
-- ✅ Implement real AI agent types (programmer, tester, debugger, researcher, writer)
-- ✅ Add workflow templating and presets
-- ✅ Implement task retry logic with exponential backoff
-- ✅ Add workflow scheduling (cron jobs)
-- ✅ Multi-user support with authentication
-- ✅ Workflow versioning and rollback
-- ✅ Advanced monitoring & analytics dashboard
+- ✅ Real AI agent pipeline (Coder, Tester, Debugger, Reviewer) using Dual-Model architecture (Mistral & DeepSeek-Coder).
+- ✅ Real-time WebSocket model health and active skill routing visualization.
+- ✅ E2E Pipeline Orchestrator with skill-based model routing.
+- ✅ Custom visual design, including new Node Detail drawers with real agent outputs.
+
+## 🔜 What's Next?
+
+- Add workflow templating and presets
+- Implement task retry logic with exponential backoff
+- Add workflow scheduling (cron jobs)
+- Multi-user support with authentication
 
 
- SYNC v0.3.0 — Real-Time Multi-Agent Orchestration
+ SYNC v1.0.0 — Real-Time Multi-Agent Orchestration
 ```
