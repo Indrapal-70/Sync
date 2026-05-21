@@ -68,6 +68,8 @@ app.include_router(tasks.router)
 app.include_router(logs.router)
 app.include_router(websocket_router.router)
 app.include_router(models_router.router)
+from app.routers import templates
+app.include_router(templates.router)
 
 
 @app.get("/")
