@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { CheckCircle2, TrendingDown, TrendingUp } from 'lucide-react'
 import useAgentStore from '../store/agentStore.js'
@@ -7,7 +7,9 @@ import useTaskStore from '../store/taskStore.js'
 import useLogStore from '../store/logStore.js'
 import useModelStore from '../store/modelStore.js'
 import AgentCard from '../components/AgentCard.jsx'
-import { Cpu } from 'lucide-react'
+import { Cpu, Terminal, Send, HardDrive, Activity } from 'lucide-react'
+import useSystemStore from '../store/systemStore.js'
+
 
 const MODEL_CONFIG = {
   'mistral:latest': {},
@@ -17,14 +19,46 @@ const MODEL_CONFIG = {
 function OrchestrationPage() {
   const { agents, activeCount, totalDeployed, setAgents } = useAgentStore()
   const { workflows, fetchWorkflows } = useWorkflowStore()
-  const { tasks: taskList, fetchTasks } = useTaskStore()
-  const { logs } = useLogStore()
   const { modelHealth, allModelsOk, fallbackActive } = useModelStore()
+  const { metrics, fetchMetrics } = useSystemStore()
+  const [command, setCommand] = useState('')
+  const [isCommandRunning, setIsCommandRunning] = useState(false)
 
   useEffect(() => {
     fetchWorkflows()
     fetchTasks()
-  }, [fetchWorkflows, fetchTasks])
+    fetchMetrics()
+    const interval = setInterval(fetchMetrics, 5000)
+    return () => clearInterval(interval)
+  }, [fetchWorkflows, fetchTasks, fetchMetrics])
+
+  const handleRunCommand = async (e) => {
+    e.preventDefault()
+    if (!command.trim()) return
+    setIsCommandRunning(true)
+    try {
+      const res = await fetch('http://localhost:8000/api/workflows', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Terminal Command', description: command })
+      })
+      if (!res.ok) throw new Error('Failed to create workflow')
+      const data = await res.json()
+      
+      const execRes = await fetch(`http://localhost:8000/api/workflows/${data.id}/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      })
+      if (!execRes.ok) throw new Error('Failed to execute workflow')
+      setCommand('')
+      fetchWorkflows()
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setIsCommandRunning(false)
+    }
+  }
 
   useEffect(() => {
     const runningTasks = taskList.filter((task) => task.status === 'running')
@@ -113,6 +147,59 @@ function OrchestrationPage() {
             </div>
           )}
         </div>
+
+        {/* Command Palette */}
+        <div className="bg-[#111111] border border-[#2a2a2a] rounded-xl p-4 flex flex-col md:flex-row items-center gap-4">
+          <div className="w-10 h-10 rounded-lg bg-[#4f6ef7]/10 flex items-center justify-center shrink-0">
+            <Terminal size={18} className="text-[#4f6ef7]" />
+          </div>
+          <form onSubmit={handleRunCommand} className="flex-1 flex w-full">
+            <input
+              type="text"
+              value={command}
+              onChange={(e) => setCommand(e.target.value)}
+              placeholder="Enter a prompt to trigger a local agent workflow..."
+              className="flex-1 bg-transparent border-none outline-none text-[#f0f0f0] text-[14px] placeholder:text-[#555]"
+              disabled={isCommandRunning}
+            />
+            <button
+              type="submit"
+              disabled={isCommandRunning || !command.trim()}
+              className="ml-4 px-4 py-2 bg-[#4f6ef7] hover:bg-[#3d5ae6] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg flex items-center gap-2 text-[12px] font-medium transition-colors"
+            >
+              {isCommandRunning ? 'Processing...' : 'Run'} <Send size={14} />
+            </button>
+          </form>
+        </div>
+
+        {/* System Metrics */}
+        {metrics && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 flex items-center gap-4">
+              <Activity size={24} className="text-[#888888]" />
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-[#888888]">CPU Usage</div>
+                <div className="text-[18px] font-semibold text-[#f0f0f0]">{metrics.cpu?.percent.toFixed(1)}%</div>
+              </div>
+            </div>
+            <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 flex items-center gap-4">
+              <HardDrive size={24} className="text-[#888888]" />
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-[#888888]">RAM Usage</div>
+                <div className="text-[18px] font-semibold text-[#f0f0f0]">{metrics.ram?.percent.toFixed(1)}% ({metrics.ram?.used_gb} / {metrics.ram?.total_gb} GB)</div>
+              </div>
+            </div>
+            {metrics.gpu && (
+              <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 flex items-center gap-4">
+                <Cpu size={24} className="text-[#888888]" />
+                <div>
+                  <div className="text-[10px] uppercase tracking-widest text-[#888888]">GPU ({metrics.gpu.name})</div>
+                  <div className="text-[18px] font-semibold text-[#f0f0f0]">{metrics.gpu.percent.toFixed(1)}% Util</div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-6">
