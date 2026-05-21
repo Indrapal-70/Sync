@@ -147,3 +147,41 @@ async def execute_workflow(
         "workflow_id": str(workflow_id),
         "tasks_created": len(created_tasks),
     }
+
+@router.post("/{workflow_id}/save-as-template")
+def save_workflow_as_template(workflow_id: UUID, db: Session = Depends(get_db)):
+    """Convert an existing workflow and its tasks into a reusable template."""
+    from app.models.workflow_template import WorkflowTemplate
+    
+    workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+        
+    tasks = db.query(Task).filter(Task.workflow_id == workflow_id).all()
+    if not tasks:
+        raise HTTPException(status_code=400, detail="Cannot save a workflow with no tasks as a template")
+        
+    tasks_schema = []
+    for t in tasks:
+        tasks_schema.append({
+            "name": t.name,
+            "description": t.description,
+            "agent_name": t.agent_name,
+            "priority": t.input_data.get("priority", 1) if t.input_data else 1,
+            "dependencies": t.input_data.get("dependencies", []) if t.input_data else []
+        })
+        
+    template = WorkflowTemplate(
+        name=f"Template: {workflow.name}",
+        description=f"Generated from workflow '{workflow.name}'",
+        tasks_schema=tasks_schema
+    )
+    db.add(template)
+    db.commit()
+    db.refresh(template)
+    
+    return {
+        "message": "Template saved successfully",
+        "template_id": template.id,
+        "tasks_saved": len(tasks_schema)
+    }
