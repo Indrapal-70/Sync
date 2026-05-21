@@ -10,7 +10,7 @@ from app.skills.model_health import run_startup_check
 from app.skills.skill_definitions import list_skills
 from app.skills.skill_router import skill_router
 from app.services.event_broadcaster import start_broadcaster
-from app.routers import health, workflows, tasks, logs, websocket_router
+from app.routers import health, workflows, tasks, logs, websocket_router, system
 from app.routers import models as models_router
 
 logger = logging.getLogger("sync")
@@ -70,6 +70,7 @@ app.include_router(websocket_router.router)
 app.include_router(models_router.router)
 from app.routers import templates
 app.include_router(templates.router)
+app.include_router(system.router)
 
 
 @app.get("/")
