@@ -2,11 +2,19 @@ from app.skills.skill_router import skill_router
 from app.agents.base_agent import BaseAgent
 
 
-async def plan_workflow(goal: str, workflow_id=None, db=None) -> list[dict]:
+async def plan_workflow(goal: str, workflow_id=None, db=None, template_id=None) -> list[dict]:
     """
     Use the 'plan' skill (mistral) to break a goal into tasks.
+    If template_id is provided, loads the task schema from the DB instead of prompting the LLM.
     Returns list of task dicts or fallback list on any failure.
     """
+    if template_id and db:
+        from app.models.workflow_template import WorkflowTemplate
+        template = db.query(WorkflowTemplate).filter(WorkflowTemplate.id == template_id).first()
+        if template and template.tasks_schema:
+            print(f"[Planner] Using template '{template.name}' ({len(template.tasks_schema)} tasks)")
+            return template.tasks_schema
+            
     print(f"[Planner] Planning workflow for goal: {goal[:80]}...")
 
     prompt = f"""
@@ -23,6 +31,7 @@ async def plan_workflow(goal: str, workflow_id=None, db=None) -> list[dict]:
         )
 
         result = BaseAgent.parse_json_robust(raw)
+
 
         if isinstance(result, list) and len(result) > 0:
             print(f"[Planner] Generated {len(result)} tasks")
