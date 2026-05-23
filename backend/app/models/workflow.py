@@ -13,5 +13,6 @@ class Workflow(Base):
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     status = Column(String, nullable=False, default="pending")
+    source_type = Column(String, default="planner")
     created_at = Column(DateTime, nullable=False)
     updated_at = Column(DateTime, nullable=False)

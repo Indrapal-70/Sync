@@ -1,5 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
+import api from '../services/api'
 import ReactFlow, {
   addEdge,
   Background,
@@ -184,85 +186,10 @@ function ButtonEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
 }
 
 /* ─────────────────────────────────────────────────────
-   CYCLE DETECTION (topological sort)
+   GRAPH VALIDATION AND TEMPLATE PARSING (imported)
    ───────────────────────────────────────────────────── */
-function hasCycle(nodes, edges) {
-  const nodeIds = new Set(nodes.map((n) => n.id))
-  const adj = new Map()
-  const inDegree = new Map()
-  nodeIds.forEach((id) => { adj.set(id, []); inDegree.set(id, 0) })
-  edges.forEach((e) => {
-    if (nodeIds.has(e.source) && nodeIds.has(e.target)) {
-      adj.get(e.source).push(e.target)
-      inDegree.set(e.target, (inDegree.get(e.target) || 0) + 1)
-    }
-  })
-  const queue = []
-  inDegree.forEach((deg, id) => { if (deg === 0) queue.push(id) })
-  let visited = 0
-  while (queue.length > 0) {
-    const curr = queue.shift()
-    visited++
-    for (const neighbor of adj.get(curr) || []) {
-      inDegree.set(neighbor, inDegree.get(neighbor) - 1)
-      if (inDegree.get(neighbor) === 0) queue.push(neighbor)
-    }
-  }
-  return visited !== nodeIds.size
-}
-
-/* ─────────────────────────────────────────────────────
-   GRAPH VALIDATION
-   ───────────────────────────────────────────────────── */
-function validateGraph(nodes, edges) {
-  const errors = []
-  const agentNodes = nodes.filter((n) => n.type === 'agentNode')
-  const startNode = nodes.find((n) => n.type === 'startNode')
-  const endNode = nodes.find((n) => n.type === 'endNode')
-
-  // 1. Must have at least one agent node
-  if (agentNodes.length === 0) {
-    errors.push('Must have at least one agent node')
-  }
-
-  // 2. START must have at least one outgoing edge
-  if (startNode) {
-    const startEdges = edges.filter((e) => e.source === startNode.id)
-    if (startEdges.length === 0) {
-      errors.push('START node must have at least one outgoing edge')
-    }
-  }
-
-  // 3. END must have at least one incoming edge
-  if (endNode) {
-    const endEdges = edges.filter((e) => e.target === endNode.id)
-    if (endEdges.length === 0) {
-      errors.push('END node must have at least one incoming edge')
-    }
-  }
-
-  // 4. No orphan agent nodes
-  agentNodes.forEach((node) => {
-    const hasEdge = edges.some((e) => e.source === node.id || e.target === node.id)
-    if (!hasEdge) {
-      errors.push(`Node "${node.data.taskName || node.data.label}" is disconnected`)
-    }
-  })
-
-  // 5. No cycles
-  if (hasCycle(nodes, edges)) {
-    errors.push('Graph contains a cycle — remove circular dependencies')
-  }
-
-  // 6. Every agent node must have a non-empty taskName
-  agentNodes.forEach((node) => {
-    if (!node.data.taskName || node.data.taskName.trim() === '') {
-      errors.push(`Node "${node.data.label}" is missing a task name`)
-    }
-  })
-
-  return errors
-}
+import { validateGraph, graphToTemplate } from '../utils/graphToTemplate'
+import { templateService } from '../services/templateService'
 
 /* ─────────────────────────────────────────────────────
    INITIAL NODES
@@ -298,9 +225,17 @@ function NodeBuilderInner() {
   const [graphName, setGraphName] = useState('')
   const [contextMenu, setContextMenu] = useState(null)
   const [undoStack, setUndoStack] = useState([])
-  const [saveModal, setSaveModal] = useState(false)
+  const [saveModalOpen, setSaveModalOpen] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [savedTemplate, setSavedTemplate] = useState(null)
   const [templateName, setTemplateName] = useState('')
   const [templateDesc, setTemplateDesc] = useState('')
+
+  const [isExecuting, setIsExecuting] = useState(false)
+  const [executedWorkflow, setExecutedWorkflow] = useState(null)
+  const [loadModalOpen, setLoadModalOpen] = useState(false)
+  const [templatesList, setTemplatesList] = useState([])
+  const navigate = useNavigate()
 
   // ─── Custom node/edge types ──────────────────────
   const nodeTypes = useMemo(() => ({
@@ -590,34 +525,193 @@ function NodeBuilderInner() {
     })
   }, [nodes, pushUndo, setNodes, setEdges])
 
-  // ─── Save as template stub ───────────────────────
   const handleSaveTemplate = useCallback(() => {
-    setSaveModal(true)
-    setTemplateName(graphName || '')
+    setSaveModalOpen(true)
+    setTemplateName(graphName || 'Untitled Graph')
     setTemplateDesc('')
   }, [graphName])
 
-  const confirmSaveTemplate = useCallback(() => {
-    // Placeholder — will be wired to POST /api/templates in Batch 2
-    console.log('[NodeBuilder] Save as template:', {
-      name: templateName,
-      description: templateDesc,
-      nodes,
-      edges,
-    })
-    setSaveModal(false)
-    alert('Template save will be connected in the next batch.')
-  }, [templateName, templateDesc, nodes, edges])
+  const confirmSaveTemplate = useCallback(async () => {
+    const errors = validateGraph(nodes, edges)
+    if (errors.length > 0) {
+      alert(`Cannot save: \n${errors.join('\n')}`)
+      return null
+    }
+    setIsSaving(true)
+    try {
+      const payload = graphToTemplate(nodes, edges, templateName, templateDesc)
+      const template = await templateService.create(payload)
+      setSavedTemplate(template)
+      setSaveModalOpen(false)
+      // We will show a toast later or an alert here
+      alert(`✓ Template saved: ${template.name}`)
+      return template
+    } catch (err) {
+      console.error('[NodeBuilder] Save failed:', err)
+      alert(`Save failed: ${err.message}`)
+      return null
+    } finally {
+      setIsSaving(false)
+    }
+  }, [nodes, edges, templateName, templateDesc])
 
-  const handleExecuteNow = useCallback(() => {
-    if (validationErrors.length > 0) {
-      alert(`Cannot execute: ${validationErrors[0]}`)
+  const handleExecuteNow = async () => {
+    const errors = validateGraph(nodes, edges)
+    if (errors.length > 0) {
+      alert(`Fix these issues first:\n\n${errors.join('\n')}`)
       return
     }
-    // Placeholder — will be wired in Batch 2
-    console.log('[NodeBuilder] Execute now:', { nodes, edges })
-    alert('Execute will be connected in the next batch.')
-  }, [validationErrors, nodes, edges])
+
+    setIsExecuting(true)
+
+    try {
+      const agentNodes = nodes.filter(
+        n => n.type !== 'startNode' && n.type !== 'endNode'
+      )
+
+      const dependencyMap = {}
+      agentNodes.forEach(n => {
+        dependencyMap[n.id] = []
+      })
+
+      edges.forEach(edge => {
+        const src = nodes.find(n => n.id === edge.source)
+        const tgt = nodes.find(n => n.id === edge.target)
+
+        if (!src || !tgt) return
+        if (src.type === 'startNode' || tgt.type === 'endNode') return
+
+        if (dependencyMap[edge.target]) {
+          dependencyMap[edge.target].push(edge.source)
+        }
+      })
+
+      const nodeBlueprints = agentNodes.map(n => ({
+        node_id:              n.id,
+        name:                 n.data.taskName || n.data.label,
+        description:          n.data.taskDescription || '',
+        agent_hint:           n.data.agentType,
+        expected_output:      n.data.expectedOutput || '',
+        max_retries_override: n.data.maxRetriesOverride || null,
+        dependencies:         dependencyMap[n.id] || [],
+      }))
+
+      const response = await api.post(
+        '/api/workflows/execute-graph',
+        {
+          workflow_name: graphName || 'Visual Editor Workflow',
+          workflow_desc: `Manually designed workflow with ${nodeBlueprints.length} tasks`,
+          nodes: nodeBlueprints,
+          source: 'visual_editor',
+        }
+      )
+
+      setExecutedWorkflow(response.data)
+      navigate(`/workflows/${response.data.workflow_id}`)
+
+    } catch (err) {
+      const detail = err.response?.data?.detail || err.message
+      alert(`Execution failed: ${detail}`)
+    } finally {
+      setIsExecuting(false)
+    }
+  }
+
+  const openLoadTemplateModal = async () => {
+    setLoadModalOpen(true)
+    try {
+      const data = await templateService.getAll()
+      setTemplatesList(data)
+    } catch (err) {
+      console.error('Failed to load templates:', err)
+      alert('Failed to load templates.')
+    }
+  }
+
+  const loadTemplateToCanvas = (template) => {
+    const blueprints = template.tasks_schema || []
+    const spacing = 250
+
+    const newNodes = [
+      {
+        id: 'start',
+        type: 'startNode',
+        position: { x: 100, y: 200 },
+        data: { label: 'START' }
+      },
+      ...blueprints.map((bp, i) => ({
+        id: bp.node_id || `node-${i}`,
+        type: 'agentNode',
+        position: { x: 400 + i * spacing, y: 200 },
+        data: {
+          agentType:       bp.agent_hint || 'coder',
+          label:           bp.name,
+          taskName:        bp.name,
+          taskDescription: bp.description,
+          expectedOutput:  bp.expected_output || '',
+          color:           AGENT_CONFIG[bp.agent_hint]?.color || '#4f6ef7',
+          icon:            AGENT_CONFIG[bp.agent_hint]?.icon || '💻',
+        }
+      })),
+      {
+        id: 'end',
+        type: 'endNode',
+        position: {
+          x: 400 + blueprints.length * spacing,
+          y: 200
+        },
+        data: { label: 'END' }
+      },
+    ]
+
+    const newEdges = []
+
+    blueprints.forEach(bp => {
+      const targetId = bp.node_id || blueprints.indexOf(bp).toString()
+
+      if (!bp.dependencies || bp.dependencies.length === 0) {
+        newEdges.push({
+          id: `e-start-${targetId}`,
+          source: 'start',
+          target: targetId,
+          type: 'default',
+          style: { stroke: '#4f6ef7', strokeWidth: 2 },
+          markerEnd: { type: 'arrowclosed', color: '#4f6ef7' },
+        })
+      } else {
+        bp.dependencies.forEach(depId => {
+          newEdges.push({
+            id: `e-${depId}-${targetId}`,
+            source: depId,
+            target: targetId,
+            type: 'default',
+            style: { stroke: '#4f6ef7', strokeWidth: 2 },
+            markerEnd: { type: 'arrowclosed', color: '#4f6ef7' },
+          })
+        })
+      }
+
+      const hasOutgoing = blueprints.some(other =>
+        (other.dependencies || []).includes(targetId)
+      )
+
+      if (!hasOutgoing) {
+        newEdges.push({
+          id: `e-${targetId}-end`,
+          source: targetId,
+          target: 'end',
+          type: 'default',
+          style: { stroke: '#4f6ef7', strokeWidth: 2 },
+          markerEnd: { type: 'arrowclosed', color: '#4f6ef7' },
+        })
+      }
+    })
+
+    setNodes(newNodes)
+    setEdges(newEdges)
+    setGraphName(template.name)
+    setLoadModalOpen(false)
+  }
 
   // ─── Selected count for toolbar ──────────────────
   const selectedCount = nodes.filter(
@@ -655,11 +749,31 @@ function NodeBuilderInner() {
           <button className="nb-toolbar-btn" onClick={clearCanvas}>
             <RotateCcw size={14} /> Clear
           </button>
+          <button className="nb-toolbar-btn" onClick={openLoadTemplateModal}>
+            Load Template
+          </button>
           <button className="nb-toolbar-btn" onClick={handleSaveTemplate}>
             <Save size={14} /> Save Template
           </button>
-          <button className="nb-toolbar-btn nb-toolbar-btn-primary" onClick={handleExecuteNow}>
-            <Play size={14} /> Execute Now
+          <button
+            onClick={handleExecuteNow}
+            disabled={isExecuting || validationErrors.length > 0}
+            style={{
+              background: validationErrors.length > 0 ? '#333' : '#22c55e',
+              color: '#000',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: 'none',
+              fontWeight: 600,
+              cursor: validationErrors.length > 0 ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              opacity: isExecuting ? 0.6 : 1,
+              marginLeft: '8px',
+            }}
+          >
+            {isExecuting ? '⏳ Executing...' : '▶ Execute Now'}
           </button>
         </div>
       </div>
@@ -783,13 +897,13 @@ function NodeBuilderInner() {
 
       {/* ── SAVE MODAL ─────────────────────────────── */}
       <AnimatePresence>
-        {saveModal && (
+        {saveModalOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="nb-modal-overlay"
-            onClick={() => setSaveModal(false)}
+            onClick={() => setSaveModalOpen(false)}
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
@@ -798,41 +912,53 @@ function NodeBuilderInner() {
               className="nb-modal"
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="nb-modal-title">Save as Template</h3>
-              <div className="nb-modal-field">
-                <label>Template Name</label>
-                <input
-                  type="text"
-                  value={templateName}
-                  onChange={(e) => setTemplateName(e.target.value)}
-                  placeholder="My Workflow Template"
-                  className="nb-modal-input"
-                />
+              <h2 className="nb-modal-title">Save as Template</h2>
+              <div className="nb-modal-content">
+                <div className="ncp-field">
+                  <label className="ncp-label">Template Name</label>
+                  <input
+                    type="text"
+                    className="ncp-input"
+                    value={templateName}
+                    onChange={(e) => setTemplateName(e.target.value)}
+                    placeholder="e.g. Content Pipeline"
+                  />
+                </div>
+                <div className="ncp-field" style={{ marginTop: '16px' }}>
+                  <label className="ncp-label">Description <span className="ncp-optional">(optional)</span></label>
+                  <textarea
+                    className="ncp-input ncp-textarea"
+                    value={templateDesc}
+                    onChange={(e) => setTemplateDesc(e.target.value)}
+                    placeholder="What does this template do?"
+                    rows={3}
+                  />
+                </div>
               </div>
-              <div className="nb-modal-field">
-                <label>Description</label>
-                <textarea
-                  value={templateDesc}
-                  onChange={(e) => setTemplateDesc(e.target.value)}
-                  placeholder="Describe what this workflow does..."
-                  rows={3}
-                  className="nb-modal-input"
-                />
-              </div>
-              <div className="nb-modal-actions">
-                <button className="nb-toolbar-btn" onClick={() => setSaveModal(false)}>Cancel</button>
+              <div className="nb-modal-footer">
                 <button
-                  className="nb-toolbar-btn nb-toolbar-btn-primary"
-                  onClick={confirmSaveTemplate}
-                  disabled={!templateName.trim()}
+                  className="ncp-apply-btn"
+                  style={{ background: '#2a2a2a', flex: 1 }}
+                  onClick={() => setSaveModalOpen(false)}
+                  disabled={isSaving}
                 >
-                  Save Template
+                  Cancel
+                </button>
+                <button
+                  className="ncp-apply-btn"
+                  style={{ flex: 1 }}
+                  onClick={confirmSaveTemplate}
+                  disabled={isSaving || !templateName.trim()}
+                >
+                  {isSaving ? 'Saving...' : 'Save Template'}
                 </button>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+
+
 
       {/* ── STYLES ─────────────────────────────────── */}
       <style>{`

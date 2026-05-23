@@ -17,6 +17,7 @@ class Task(Base):
     description = Column(Text, nullable=True)
     status = Column(String, nullable=False, default="pending")
     agent_name = Column(String, nullable=True)
+    node_id = Column(String, nullable=True)
     input_data = Column(JSON, nullable=True)
     output_data = Column(JSON, nullable=True)
     subtasks = Column(JSON, nullable=True)

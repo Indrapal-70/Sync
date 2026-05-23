@@ -11,14 +11,21 @@ router = APIRouter(prefix="/api/templates", tags=["Templates"])
 class TaskSchema(BaseModel):
     name: str
     description: str
-    agent_name: str
-    priority: int
-    dependencies: List[str]
+    agent_name: Optional[str] = None
+    agent_hint: Optional[str] = None
+    priority: int = 1
+    dependencies: List[str] = []
+    node_id: Optional[str] = None
+    expected_output: Optional[str] = None
+    max_retries_override: Optional[int] = None
 
 class TemplateCreate(BaseModel):
     name: str
     description: Optional[str] = None
     tasks_schema: List[TaskSchema]
+    category: Optional[str] = "custom"
+    model_hints: Optional[dict] = {}
+    source: Optional[str] = None
 
 class TemplateResponse(BaseModel):
     id: str

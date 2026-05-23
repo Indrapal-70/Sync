@@ -82,6 +82,31 @@ const useWorkflowStore = create((set, get) => ({
       set({ error: error?.message || 'Failed to execute workflow', isLoading: false })
     }
   },
+  fetchTimeline: async (id) => {
+    try {
+      const data = await workflowService.getTimeline(id)
+      return data.timeline || []
+    } catch (error) {
+      console.error('Failed to fetch timeline', error)
+      return []
+    }
+  },
+  fetchSummary: async (id) => {
+    try {
+      return await workflowService.getSummary(id)
+    } catch (error) {
+      console.error('Failed to fetch summary', error)
+      return null
+    }
+  },
+  saveAsTemplate: async (id) => {
+    try {
+      return await workflowService.saveAsTemplate(id)
+    } catch (error) {
+      console.error('Failed to save as template', error)
+      throw error
+    }
+  },
   handleWebSocketEvent: (message) => {
     if (!message?.event) return
     const { event, payload } = message

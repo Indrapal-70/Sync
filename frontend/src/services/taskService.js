@@ -13,4 +13,6 @@ export const taskService = {
   update: (id, data) => api.patch(`/api/tasks/${id}`, data).then((r) => r.data),
 
   delete: (id) => api.delete(`/api/tasks/${id}`).then((r) => r.data),
+
+  getAgentOutput: (id) => api.get(`/api/tasks/${id}/agent-output`).then((r) => r.data),
 }

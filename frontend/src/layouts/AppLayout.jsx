@@ -10,6 +10,7 @@ import {
   ScrollText,
   Settings,
   SlidersHorizontal,
+  Network
 } from 'lucide-react'
 import ModelStatusBar from '../components/ModelStatusBar'
 import useModelStore from '../store/modelStore'
@@ -17,6 +18,7 @@ import useModelStore from '../store/modelStore'
 const navItems = [
   { label: 'Orchestration', icon: LayoutDashboard, to: '/orchestration' },
   { label: 'Workflows', icon: GitBranch, to: '/workflows' },
+  { label: 'Visual Editor', icon: Network, to: '/builder' },
   { label: 'Agent Fleet', icon: Bot, to: '/agents' },
   { label: 'Terminal Logs', icon: ScrollText, to: '/logs' },
   { label: 'Project Settings', icon: Settings, to: '/settings' },

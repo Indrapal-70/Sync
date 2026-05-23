@@ -133,7 +133,7 @@ const nodeTypes = {
   validationLoop: ValidationLoopNode,
 }
 
-function WorkflowDAG({ workflow, tasks }) {
+function WorkflowDAG({ workflow, tasks, onTaskSelect }) {
   const nodes = useMemo(() => {
     const base = [
       {
@@ -215,6 +215,11 @@ function WorkflowDAG({ workflow, tasks }) {
         nodesDraggable={false}
         zoomOnScroll={false}
         panOnScroll
+        onNodeClick={(_, node) => {
+          if (node.type === 'sequence' && onTaskSelect) {
+            onTaskSelect(node.id)
+          }
+        }}
         className="rf-dark"
       >
         <Background gap={24} size={1} color="#2a2a2a" />

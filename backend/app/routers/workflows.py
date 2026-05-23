@@ -5,6 +5,7 @@ from uuid import UUID
 from app.database.session import get_db
 from app.models.workflow import Workflow
 from app.models.task import Task
+from app.models.workflow_log import WorkflowLog
 from app.schemas.workflow import WorkflowCreate, WorkflowUpdate, WorkflowResponse
 from app.services.redis_client import publish_event
 from app.services.log_service import create_log
@@ -78,6 +79,76 @@ def update_workflow(workflow_id: UUID, workflow_update: WorkflowUpdate, db: Sess
     
     return workflow
 
+@router.get("/{workflow_id}/timeline")
+def get_workflow_timeline(workflow_id: UUID, db: Session = Depends(get_db)):
+    """
+    P7-02: Returns an ordered list of events for the workflow timeline.
+    """
+    workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+        
+    logs = db.query(WorkflowLog).filter(WorkflowLog.workflow_id == workflow_id).order_by(WorkflowLog.created_at.asc()).all()
+    
+    timeline = []
+    for log in logs:
+        timeline.append({
+            "id": str(log.id),
+            "timestamp": log.created_at.isoformat(),
+            "level": log.level,
+            "message": log.message,
+            "agent_name": log.agent_name,
+            "pipeline_stage": log.pipeline_stage,
+            "task_id": str(log.task_id) if log.task_id else None
+        })
+    return {"timeline": timeline}
+
+
+@router.get("/{workflow_id}/summary")
+def get_workflow_summary(workflow_id: UUID, db: Session = Depends(get_db)):
+    """
+    P7-03: Returns structured summary of the workflow execution.
+    """
+    workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+        
+    tasks = db.query(Task).filter(Task.workflow_id == workflow_id).all()
+    
+    total_tasks = len(tasks)
+    completed_tasks = len([t for t in tasks if t.status == "completed"])
+    failed_tasks = len([t for t in tasks if t.status == "failed"])
+    
+    models_used = set()
+    agents_used = set()
+    for t in tasks:
+        if t.agent_name:
+            agents_used.add(t.agent_name)
+        if hasattr(t, "model_summary") and t.model_summary: # Wait, task model uses agent_output or output_data
+            pass # We will extract models later
+            
+        if t.agent_output:
+            for ag, out in t.agent_output.items():
+                if isinstance(out, dict) and out.get("model_used"):
+                    models_used.add(out["model_used"])
+    
+    duration_seconds = 0
+    if workflow.updated_at and workflow.created_at:
+        duration_seconds = (workflow.updated_at - workflow.created_at).total_seconds()
+        
+    return {
+        "workflow_id": str(workflow.id),
+        "name": workflow.name,
+        "status": workflow.status,
+        "total_tasks": total_tasks,
+        "completed_tasks": completed_tasks,
+        "failed_tasks": failed_tasks,
+        "agents_used": list(agents_used),
+        "models_used": list(models_used),
+        "duration_seconds": round(duration_seconds, 2)
+    }
+
+
 @router.delete("/{workflow_id}")
 def delete_workflow(workflow_id: UUID, db: Session = Depends(get_db)):
     workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
@@ -91,17 +162,26 @@ def delete_workflow(workflow_id: UUID, db: Session = Depends(get_db)):
     return {"message": "Workflow deleted successfully"}
 
 
+from fastapi import Body
+
 @router.post("/{workflow_id}/execute")
 async def execute_workflow(
     workflow_id: UUID,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    body: dict = Body(default={}),
 ):
     workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
     if not workflow:
         raise HTTPException(status_code=404, detail="Workflow not found")
 
-    task_plan = await plan_workflow(workflow.description or workflow.name)
+    template_id = body.get("template_id") if body else None
+    task_plan = await plan_workflow(
+        goal=workflow.description or workflow.name, 
+        workflow_id=workflow_id, 
+        db=db, 
+        template_id=template_id
+    )
     created_tasks = []
     for item in task_plan:
         task = Task(
@@ -147,6 +227,58 @@ async def execute_workflow(
         "workflow_id": str(workflow_id),
         "tasks_created": len(created_tasks),
     }
+
+from app.schemas.graph import GraphExecuteRequest, GraphExecuteResponse
+from app.services.graph_executor import graph_executor
+
+@router.post("/execute-graph", response_model=GraphExecuteResponse)
+async def execute_graph(
+    request: GraphExecuteRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    # 1. Topological sort — raises 400 on cycle
+    try:
+        sorted_nodes = graph_executor.topological_sort(request.nodes)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # 2. Create Workflow DB record
+    workflow = Workflow(
+        id=uuid.uuid4(),
+        name=request.workflow_name,
+        description=request.workflow_desc,
+        status="running",
+        source_type="visual_editor",
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
+    )
+
+    db.add(workflow)
+    db.commit()
+    db.refresh(workflow)
+
+    # 3. Create tasks + trigger execution
+    tasks = await graph_executor.execute_graph(
+        str(workflow.id),
+        sorted_nodes,
+        db,
+        background_tasks
+    )
+
+    # 4. Publish event
+    publish_event("workflow_started", {
+        "workflow_id": str(workflow.id),
+        "source_type": "visual_editor",
+        "task_count": len(tasks)
+    })
+
+    return GraphExecuteResponse(
+        workflow_id=str(workflow.id),
+        task_count=len(tasks),
+        exec_order=[n.name for n in sorted_nodes],
+        message=f"Graph workflow started with {len(tasks)} tasks in dependency order"
+    )
 
 @router.post("/{workflow_id}/save-as-template")
 def save_workflow_as_template(workflow_id: UUID, db: Session = Depends(get_db)):

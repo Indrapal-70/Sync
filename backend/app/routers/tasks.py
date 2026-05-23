@@ -110,6 +110,26 @@ def update_task(task_id: UUID, task_update: TaskUpdate, db: Session = Depends(ge
         
     return task
 
+@router.get("/{task_id}/agent-output")
+def get_agent_output(task_id: UUID, db: Session = Depends(get_db)):
+    """
+    P7-01: Return the full agent_output JSON for a task.
+    Contains the raw results from each agent that processed this task
+    (coder, tester, debugger, reviewer), including model_used metadata.
+    """
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {
+        "task_id": str(task.id),
+        "task_name": task.name,
+        "status": task.status,
+        "pipeline_stage": task.pipeline_stage,
+        "agent_output": task.agent_output or {},
+        "output_data": task.output_data or {},
+    }
+
+
 @router.delete("/{task_id}")
 def delete_task(task_id: UUID, db: Session = Depends(get_db)):
     task = db.query(Task).filter(Task.id == task_id).first()

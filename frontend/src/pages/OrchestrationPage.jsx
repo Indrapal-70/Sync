@@ -21,6 +21,8 @@ function OrchestrationPage() {
   const { workflows, fetchWorkflows } = useWorkflowStore()
   const { modelHealth, allModelsOk, fallbackActive } = useModelStore()
   const { metrics, fetchMetrics } = useSystemStore()
+  const { tasks: taskList, fetchTasks } = useTaskStore()
+  const { logs } = useLogStore()
   const [command, setCommand] = useState('')
   const [isCommandRunning, setIsCommandRunning] = useState(false)
 

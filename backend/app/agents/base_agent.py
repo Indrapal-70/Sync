@@ -104,3 +104,21 @@ class BaseAgent:
             pass
 
         raise ValueError(f"Could not parse JSON from response: {raw[:200]}")
+
+def get_agent_for_type(agent_type: str):
+    from app.agents.coder_agent    import CoderAgent
+    from app.agents.tester_agent   import TesterAgent
+    from app.agents.debugger_agent import DebuggerAgent
+    from app.agents.reviewer_agent import ReviewerAgent
+    from app.agents.planner_agent  import PlannerAgent
+
+    agent_map = {
+        "coder":    CoderAgent,
+        "tester":   TesterAgent,
+        "debugger": DebuggerAgent,
+        "reviewer": ReviewerAgent,
+        "planner":  PlannerAgent,
+    }
+
+    cls = agent_map.get(agent_type)
+    return cls

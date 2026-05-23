@@ -12,4 +12,10 @@ export const workflowService = {
   delete: (id) => api.delete(`/api/workflows/${id}`).then((r) => r.data),
 
   execute: (id) => api.post(`/api/workflows/${id}/execute`).then((r) => r.data),
+
+  getTimeline: (id) => api.get(`/api/workflows/${id}/timeline`).then((r) => r.data),
+
+  getSummary: (id) => api.get(`/api/workflows/${id}/summary`).then((r) => r.data),
+
+  saveAsTemplate: (id) => api.post(`/api/workflows/${id}/save-as-template`).then((r) => r.data),
 }

@@ -43,6 +43,14 @@ const useTaskStore = create((set, get) => ({
       set({ isLoading: false })
     }
   },
+  fetchAgentOutput: async (id) => {
+    try {
+      return await taskService.getAgentOutput(id)
+    } catch (error) {
+      console.error('Failed to fetch agent output', error)
+      return null
+    }
+  },
   handleWebSocketEvent: (message) => {
     if (!message?.event) return
     const { event, payload } = message
