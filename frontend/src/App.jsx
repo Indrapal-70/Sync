@@ -5,8 +5,10 @@ import WorkflowsPage from './pages/WorkflowsPage.jsx'
 import AgentFleetPage from './pages/AgentFleetPage.jsx'
 import KanbanPage from './pages/KanbanPage.jsx'
 import NodeBuilderPage from './pages/NodeBuilderPage.jsx'
+import WorkflowViewerPage from './pages/WorkflowViewerPage.jsx'
 import TerminalLogsPage from './pages/TerminalLogsPage.jsx'
 import ProjectSettingsPage from './pages/ProjectSettingsPage.jsx'
+import NotFoundPage from './pages/NotFoundPage.jsx'
 
 function App() {
   return (
@@ -16,13 +18,14 @@ function App() {
         <Route path="/orchestration" element={<OrchestrationPage />} />
         <Route path="/workflows" element={<KanbanPage />} />
         <Route path="/workflows/:id" element={<WorkflowsPage />} />
-        <Route path="/workflows/:id/builder" element={<NodeBuilderPage />} />
+        <Route path="/workflows/:id/builder" element={<WorkflowViewerPage />} />
+        <Route path="/builder" element={<NodeBuilderPage />} />
         <Route path="/agents" element={<AgentFleetPage />} />
         <Route path="/agents/:id" element={<AgentFleetPage />} />
         <Route path="/logs" element={<TerminalLogsPage />} />
         <Route path="/settings" element={<ProjectSettingsPage />} />
       </Route>
-      <Route path="*" element={<Navigate to="/orchestration" replace />} />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )
 }
