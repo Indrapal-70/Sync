@@ -1,5 +1,16 @@
 from app.agents.base_agent import BaseAgent
+from app.services.context_buffer import agent_context_buffer, ContextEntry
+import json
+import time
 
+def _summarize(data) -> str:
+    if not data:
+        return ""
+    try:
+        s = json.dumps(data)
+    except Exception:
+        s = str(data)
+    return s[:200]
 
 class CoderAgent(BaseAgent):
     name = "coder"
@@ -12,13 +23,20 @@ class CoderAgent(BaseAgent):
         previous_code  = task_context.get("code_output", {}).get("code", "")
         db             = task_context.get("db")
         workflow_id    = task_context.get("workflow_id")
-        task_id        = task_context.get("task_id")
+        task_id        = task_context.get("task_id") or self.task_id
 
         self.log(f"Starting task: {task_name}")
         self.publish_stage("coding")
 
         language_hint = self._detect_language(task_desc + " " + task_name)
         self.log(f"Detected language: {language_hint}", "debug")
+
+        context_prompt = ""
+        if task_id:
+            context_prompt = await agent_context_buffer.build_context_prompt(
+                task_id=str(task_id),
+                requesting_agent=self.__class__.__name__
+            )
 
         if previous_error:
             self.log("Running in REVISION mode", "debug")
@@ -47,6 +65,19 @@ Language: Write this in {language_hint}.
 
 Write complete, working code that solves this task.
 """
+
+        if context_prompt:
+            prompt = f"""{context_prompt}
+
+IMPORTANT: Previous attempts to write this code have FAILED.
+The test output and suggested fix from the Debugger are provided
+in the Execution History above. Your new code MUST directly address
+those specific failures. Do not repeat the same mistakes.
+
+---
+
+## Your Current Task
+{prompt}"""
 
         try:
             raw = await self.call_skill("code", prompt)
@@ -101,10 +132,40 @@ Write complete, working code that solves this task.
 
             self.log(f"Code written in {result.get('language', language_hint)}")
             result["salvaged"] = salvaged
+
+            if task_id:
+                await agent_context_buffer.add_entry(
+                    task_id=str(task_id),
+                    entry=ContextEntry(
+                        agent_name=self.__class__.__name__,
+                        step=len(agent_context_buffer._store.get(str(task_id), [])),
+                        input_summary=_summarize(task_context),
+                        output_summary=_summarize(result),
+                        status="passed",
+                        timestamp=time.time(),
+                        healing_cycle=task_context.get("cycle", 0)
+                    )
+                )
+
             return {"success": True, "agent": self.name, "output": result}
 
         except Exception as e:
             self.log(f"Coding failed: {e}", "error")
+
+            if task_id:
+                await agent_context_buffer.add_entry(
+                    task_id=str(task_id),
+                    entry=ContextEntry(
+                        agent_name=self.__class__.__name__,
+                        step=len(agent_context_buffer._store.get(str(task_id), [])),
+                        input_summary=_summarize(task_context),
+                        output_summary=str(e),
+                        status="failed",
+                        timestamp=time.time(),
+                        healing_cycle=task_context.get("cycle", 0)
+                    )
+                )
+
             return {
                 "success":  False,
                 "agent":    self.name,
