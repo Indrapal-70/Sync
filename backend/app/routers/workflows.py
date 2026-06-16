@@ -263,7 +263,8 @@ async def execute_graph(
         str(workflow.id),
         sorted_nodes,
         db,
-        background_tasks
+        background_tasks,
+        raw_graph=request.raw_graph
     )
 
     # 4. Publish event
