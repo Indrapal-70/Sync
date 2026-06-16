@@ -139,3 +139,29 @@ def delete_task(task_id: UUID, db: Session = Depends(get_db)):
     db.commit()
     publish_event("task_deleted", {"id": str(task_id)})
     return {"message": "Task deleted"}
+
+@router.get("/{task_id}/healing-log")
+def get_task_healing_log(task_id: UUID, db: Session = Depends(get_db)):
+    from app.services.graph_executor import graph_executor
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    logs = graph_executor.healing_logs.get(str(task_id), [])
+    return {
+        "task_id": str(task_id),
+        "healing_cycles": logs
+    }
+
+@router.get("/{task_id}/context-buffer")
+def get_task_context_buffer(task_id: UUID):
+    from app.core.config import settings
+    if settings.app_env != "development":
+        raise HTTPException(status_code=403, detail="Only available in development mode")
+    try:
+        from app.services.context_buffer import agent_context_buffer
+        import dataclasses
+        entries = agent_context_buffer._store.get(str(task_id), [])
+        serialized_entries = [dataclasses.asdict(e) for e in entries]
+        return {"task_id": str(task_id), "entries": serialized_entries}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
