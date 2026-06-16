@@ -1,6 +1,17 @@
 import json
+import time
 
 from app.agents.base_agent import BaseAgent
+from app.services.context_buffer import agent_context_buffer, ContextEntry
+
+def _summarize(data) -> str:
+    if not data:
+        return ""
+    try:
+        s = json.dumps(data)
+    except Exception:
+        s = str(data)
+    return s[:200]
 
 
 class DebuggerAgent(BaseAgent):
@@ -13,9 +24,17 @@ class DebuggerAgent(BaseAgent):
         test_results = task_context.get("test_results", {})
         critical_issues = test_results.get("results", {}).get("critical_issues", [])
         prev_attempts = task_context.get("prev_debug_attempts", [])
+        task_id = task_context.get("task_id") or self.task_id
 
         self.log(f"Debugging: {task_name}", "warning")
         self.publish_stage("debugging")
+
+        context_prompt = ""
+        if task_id:
+            context_prompt = await agent_context_buffer.build_context_prompt(
+                task_id=str(task_id),
+                requesting_agent=self.__class__.__name__
+            )
 
         prev_context = ""
         if prev_attempts:
@@ -41,6 +60,8 @@ All test results:
 {prev_context}
 Produce the complete fixed code.
 """
+        if context_prompt:
+            prompt = f"{context_prompt}\n\n{prompt}"
 
         try:
             raw = await self.call_skill("debug", prompt)
@@ -68,16 +89,31 @@ Produce the complete fixed code.
             if low_confidence:
                 self.log("Low confidence fix - extra testing will apply", "warning")
 
-            return {
+            res = {
                 "success": True,
                 "agent": self.name,
                 "fixed_code": fixed_code,
                 "low_confidence": low_confidence,
                 "output": result,
             }
+            if task_id:
+                await agent_context_buffer.add_entry(
+                    task_id=str(task_id),
+                    entry=ContextEntry(
+                        agent_name=self.__class__.__name__,
+                        step=len(agent_context_buffer._store.get(str(task_id), [])),
+                        input_summary=_summarize(task_context),
+                        output_summary=_summarize(res),
+                        status="passed",
+                        suggested_fix=result.get("explanation", "") or result.get("root_cause", ""),
+                        timestamp=time.time(),
+                        healing_cycle=task_context.get("cycle", 0)
+                    )
+                )
+            return res
         except Exception as e:
             self.log(f"Debug failed: {e}", "error")
-            return {
+            res = {
                 "success": False,
                 "agent": self.name,
                 "fixed_code": code,
@@ -85,3 +121,18 @@ Produce the complete fixed code.
                 "error": str(e),
                 "output": {},
             }
+            if task_id:
+                await agent_context_buffer.add_entry(
+                    task_id=str(task_id),
+                    entry=ContextEntry(
+                        agent_name=self.__class__.__name__,
+                        step=len(agent_context_buffer._store.get(str(task_id), [])),
+                        input_summary=_summarize(task_context),
+                        output_summary=str(e),
+                        status="failed",
+                        error_details=str(e),
+                        timestamp=time.time(),
+                        healing_cycle=task_context.get("cycle", 0)
+                    )
+                )
+            return res
