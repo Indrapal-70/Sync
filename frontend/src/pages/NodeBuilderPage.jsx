@@ -88,6 +88,74 @@ function AgentNode({ id, data, selected }) {
   )
 }
 
+function HealingAgentNode({ id, data, selected }) {
+  const { setNodes, setEdges } = useReactFlow()
+
+  const deleteNode = useCallback((e) => {
+    e.stopPropagation()
+    setNodes((nds) => nds.filter((n) => n.id !== id))
+    setEdges((eds) => eds.filter((e) => e.source !== id && e.target !== id))
+  }, [id, setNodes, setEdges])
+
+  const displayLabel = data.taskName || data.label
+
+  return (
+    <div
+      className="agent-node healing-node"
+      style={{
+        borderColor: selected ? '#ffffff' : '#f59e0b',
+        borderStyle: 'dashed',
+        borderWidth: '2px',
+        boxShadow: selected ? `0 0 16px #f59e0b44` : 'none',
+        background: 'rgba(245, 158, 11, 0.08)',
+      }}
+    >
+      <div className="agent-node-accent" style={{ background: '#f59e0b' }} />
+
+      <Handle type="target" position={Position.Top} className="agent-node-handle" />
+
+      <div className="agent-node-body">
+        <div className="agent-node-header">
+          <span className="agent-node-icon">{data.icon || '🔧'}</span>
+          <span className="agent-node-label">{displayLabel}</span>
+          <button
+            className="agent-node-delete"
+            onClick={deleteNode}
+            title="Delete node"
+          >
+            <X size={12} />
+          </button>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+          <span
+            className="agent-node-badge"
+            style={{ background: `rgba(245, 158, 11, 0.15)`, color: '#f59e0b', borderColor: `rgba(245, 158, 11, 0.3)` }}
+          >
+            {data.agentType}
+          </span>
+          <span
+            style={{
+              fontSize: '8px',
+              fontWeight: 700,
+              background: '#f59e0b',
+              color: '#000',
+              padding: '1px 4px',
+              borderRadius: '3px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '2px',
+            }}
+          >
+            🔧 HEALER
+          </span>
+        </div>
+      </div>
+
+      <Handle type="source" position={Position.Bottom} className="agent-node-handle" />
+    </div>
+  )
+}
+
 /* ─────────────────────────────────────────────────────
    CUSTOM NODE: StartNode
    ───────────────────────────────────────────────────── */
@@ -220,6 +288,8 @@ function NodeBuilderInner() {
 
   const [nodes, setNodes, onNodesChange] = useNodesState(INITIAL_NODES)
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
+  const [healingBanner, setHealingBanner] = useState(null)
+  const [healingCyclesCount, setHealingCyclesCount] = useState(0)
   const [selectedNode, setSelectedNode] = useState(null)
   const [configPanelOpen, setConfigPanelOpen] = useState(false)
   const [graphName, setGraphName] = useState('')
@@ -242,11 +312,65 @@ function NodeBuilderInner() {
     agentNode: AgentNode,
     startNode: StartNode,
     endNode: EndNode,
+    HealingAgentNode: HealingAgentNode,
   }), [])
 
   const edgeTypes = useMemo(() => ({
     default: ButtonEdge,
   }), [])
+
+  // ─── WebSocket Auto-Healing Event Listener ───────
+  useEffect(() => {
+    const handleWsMessage = (e) => {
+      const message = e.detail
+      const { event, payload } = message
+
+      if (event === 'graph_patched') {
+        setNodes(payload.graph.nodes.map(n => ({
+          ...n,
+          data: {
+            ...n.data,
+            isHealingNode: n.data?.spawned_by_healing === true,
+          }
+        })))
+        setEdges(payload.graph.edges)
+      }
+
+      if (event === 'healing_started') {
+        setHealingBanner({
+          cycle: payload.cycle,
+          failedAgent: payload.failed_agent
+        })
+        setHealingCyclesCount(payload.cycle)
+      }
+    }
+
+    window.addEventListener('ws_message', handleWsMessage)
+    return () => window.removeEventListener('ws_message', handleWsMessage)
+  }, [setNodes, setEdges])
+
+  // ─── Dynamic Visual Transformation ───────────────
+  const processedNodes = useMemo(() => {
+    return nodes.map(n => {
+      if (n.data?.isHealingNode || n.data?.spawned_by_healing) {
+        return { ...n, type: 'HealingAgentNode' }
+      }
+      return n
+    })
+  }, [nodes])
+
+  const processedEdges = useMemo(() => {
+    return edges.map(edge => {
+      if (edge.data?.healing) {
+        return {
+          ...edge,
+          style: { stroke: "#f59e0b", strokeWidth: 2, strokeDasharray: "6 3" },
+          markerEnd: { type: 'arrowclosed', color: '#f59e0b' }
+        }
+      }
+      return edge
+    })
+  }, [edges])
 
   // ─── Validation ──────────────────────────────────
   const validationErrors = useMemo(
@@ -730,6 +854,22 @@ function NodeBuilderInner() {
         <div className="nb-toolbar-left">
           <span className="nb-toolbar-title">Visual Workflow Editor</span>
           <span className="nb-toolbar-badge">Beta</span>
+          {healingCyclesCount > 0 && (
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 600,
+                background: 'rgba(245, 158, 11, 0.15)',
+                color: '#f59e0b',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                border: '1px solid rgba(245, 158, 11, 0.3)',
+                marginLeft: '8px'
+              }}
+            >
+              🔧 Auto-healing: {healingCyclesCount} cycle(s) completed
+            </span>
+          )}
         </div>
         <div className="nb-toolbar-center">
           <input
@@ -784,8 +924,8 @@ function NodeBuilderInner() {
 
         <div className="nb-canvas-area" ref={reactFlowWrapper}>
           <ReactFlow
-            nodes={nodes}
-            edges={edges}
+            nodes={processedNodes}
+            edges={processedEdges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
@@ -827,6 +967,45 @@ function NodeBuilderInner() {
               </defs>
             </svg>
           </ReactFlow>
+
+          {healingBanner && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '16px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 10,
+                background: '#1e1b4b',
+                border: '1px solid #f59e0b',
+                color: '#fbbf24',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                fontSize: '13px',
+                fontWeight: 500,
+              }}
+            >
+              <span>🔧 Auto-healing cycle {healingBanner.cycle} started — DebuggerAgent injected</span>
+              <button
+                onClick={() => setHealingBanner(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#f59e0b',
+                  cursor: 'pointer',
+                  padding: '2px',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
 
           {/* Context menu */}
           <AnimatePresence>

@@ -60,6 +60,7 @@ const useWebSocket = () => {
       try {
         const message = JSON.parse(event.data)
         routeMessage(message)
+        window.dispatchEvent(new CustomEvent('ws_message', { detail: message }))
       } catch (error) {
         console.error('[WS] Parse error', error)
       }
