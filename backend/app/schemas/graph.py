@@ -1,5 +1,16 @@
 from pydantic import BaseModel
 from typing import List, Optional
+from enum import Enum
+
+class FailurePolicy(str, Enum):
+    HALT = "halt"           # existing behavior
+    RETRY = "retry"         # simple retry same agent, up to N times
+    HEAL = "heal"           # insert Debugger -> loop to Coder
+
+class HealingConfig:
+    max_healing_cycles: int = 3   # prevent infinite loops
+    retry_limit: int = 2          # for RETRY policy
+
 
 class NodeBlueprint(BaseModel):
     node_id:              str
@@ -15,6 +26,8 @@ class GraphExecuteRequest(BaseModel):
     workflow_desc:   Optional[str]   = ""
     nodes:           List[NodeBlueprint]
     source:          str            = "visual_editor"
+    raw_graph:       Optional[dict] = None
+    failure_policy:  Optional[FailurePolicy] = FailurePolicy.HALT
 
 class GraphExecuteResponse(BaseModel):
     workflow_id:  str
