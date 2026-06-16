@@ -10,6 +10,7 @@ from app.agents.coder_agent import CoderAgent
 from app.agents.tester_agent import TesterAgent
 from app.agents.debugger_agent import DebuggerAgent
 from app.agents.reviewer_agent import ReviewerAgent
+from app.services.context_buffer import agent_context_buffer
 from app.models.task import Task
 from app.models.workflow import Workflow
 from app.services.log_service import create_log
@@ -89,76 +90,11 @@ async def run_pipeline(
 
 async def _run_graph_mode(workflow_id: str, task_ids: list, db):
     """Execute pre-created tasks in the given order (graph mode).
-       Respects dependency order (task_ids is already topologically sorted).
-       Each task is run by the agent specified in task.agent_name.
+       Each task is run dynamically using the GraphExecutor.
     """
-    from app.agents.base_agent import get_agent_for_type
+    from app.services.graph_executor import graph_executor
+    await graph_executor.run_graph(str(workflow_id), db)
 
-    # Start the workflow
-    workflow = db.query(Workflow).filter(Workflow.id == workflow_id).first()
-    if workflow:
-        _set_workflow_status(db, workflow, "running")
-
-    for task_id in task_ids:
-        task = db.query(Task).filter_by(id=task_id).first()
-        if not task:
-            continue
-
-        agent = get_agent_for_type(task.agent_name)
-        if not agent:
-            create_log(
-                db,
-                workflow_id,
-                f"[GRAPH] Unknown agent type: {task.agent_name} — skipping",
-                "warning",
-                task_id
-            )
-            continue
-
-        try:
-            task.status = "running"
-            db.commit()
-
-            publish_event("task_updated", {
-                "id": str(task_id),
-                "status": "running"
-            })
-
-            agent = agent(db, workflow_id, task_id)
-
-            context = {
-                "name": task.name,
-                "description": task.description,
-                "input_data": task.input_data or {},
-                "previous_error": None,
-                "code_output": {},
-                "test_results": {},
-            }
-            result = await agent.run(context)
-            
-            task.status = "done" if result.get("success") else "failed"
-            task.agent_output = result
-            db.commit()
-
-            publish_event("task_updated", {
-                "id": str(task_id),
-                "status": task.status,
-                "agent_name": task.agent_name
-            })
-
-        except Exception as e:
-            task.status = "failed"
-            db.commit()
-            create_log(
-                db,
-                workflow_id,
-                f"[GRAPH] Task '{task.name}' failed: {str(e)}",
-                "error",
-                task_id
-            )
-
-    if workflow:
-        _set_workflow_status(db, workflow, "completed")
 
 
 async def _run_task_pipeline(task: Task, workflow_id: UUID, db: Session) -> bool:
@@ -182,6 +118,7 @@ async def _run_task_pipeline(task: Task, workflow_id: UUID, db: Session) -> bool
 
     if not coder_result["success"]:
         _set_task(db, task, status="failed", pipeline_stage="coding_failed")
+        await agent_context_buffer.clear(task_id)
         return False
 
     context["code_output"] = coder_result["output"]
@@ -246,6 +183,7 @@ async def _run_task_pipeline(task: Task, workflow_id: UUID, db: Session) -> bool
 
     if not tests_passed:
         _set_task(db, task, status="failed", pipeline_stage="testing_failed")
+        await agent_context_buffer.clear(task_id)
         return False
 
     review_passed = False
@@ -288,6 +226,7 @@ async def _run_task_pipeline(task: Task, workflow_id: UUID, db: Session) -> bool
             context["code_output"] = coder_result["output"]
 
     _finalize_task(db, task, context)
+    await agent_context_buffer.clear(task_id)
     return review_passed
 
 def _finalize_task(db, task, context):
