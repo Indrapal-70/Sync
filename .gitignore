@@ -4,3 +4,4 @@ vite-monorepo/
 .DS_Store
 Thumbs.db
 .vscode/
+context.txt
