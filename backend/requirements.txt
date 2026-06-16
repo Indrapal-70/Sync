@@ -32,3 +32,11 @@ psutil
 
 # GPU metrics (Phase 6 - VRAM monitoring, optional - install manually if pynvml not available)
 # pynvml
+
+# Testing
+pytest
+pytest-asyncio
+pytest-mock
+faker
+freezegun
+
