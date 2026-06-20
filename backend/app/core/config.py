@@ -27,3 +27,6 @@ class Settings(BaseSettings):
         extra = "allow"
 
 settings = Settings()
+
+import os
+MAX_CONCURRENT_PIPELINES = int(os.getenv("MAX_CONCURRENT_PIPELINES", "2"))
