@@ -34,3 +34,4 @@ class GraphExecuteResponse(BaseModel):
     task_count:   int
     exec_order:   List[str]  # node names in topological execution order
     message:      str
+    queue_position: Optional[int] = None
