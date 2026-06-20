@@ -95,6 +95,8 @@ class DockerExecutor:
                 "docker", "run",
                 "--rm",
                 "--name", container_name,
+                "--label", "sync.managed=true",
+                "--label", f"sync.task_id={task_id}",
                 "--network", "none",
                 "--memory", SANDBOX_MEMORY_LIMIT,
                 "--memory-swap", SANDBOX_MEMORY_LIMIT,
