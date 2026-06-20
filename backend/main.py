@@ -52,6 +52,27 @@ async def lifespan(app: FastAPI):
         app.state.background_tasks.add(task)
         task.add_done_callback(app.state.background_tasks.discard)
 
+    # Start ContainerReaper
+    from app.services.container_reaper import container_reaper
+    await container_reaper.start(interval_seconds=10, max_age_seconds=300)
+    if container_reaper._task:
+        app.state.background_tasks.add(container_reaper._task)
+        container_reaper._task.add_done_callback(app.state.background_tasks.discard)
+
+    # Start ContextBuffer Sweeper
+    async def context_buffer_sweeper():
+        from app.services.context_buffer import agent_context_buffer
+        while True:
+            try:
+                await agent_context_buffer.sweep_stale(max_age_seconds=1800)
+            except Exception as e:
+                logger.error(f"Error in context_buffer_sweeper: {e}")
+            await asyncio.sleep(60)
+
+    context_buffer_task = asyncio.create_task(context_buffer_sweeper())
+    app.state.background_tasks.add(context_buffer_task)
+    context_buffer_task.add_done_callback(app.state.background_tasks.discard)
+
     skills = list_skills()
     print(f"[SYNC] {len(skills)} skills loaded: {[s['name'] for s in skills]}")
     yield
@@ -59,6 +80,7 @@ async def lifespan(app: FastAPI):
     print("[SYNC] Shutting down...")
     for w in workers:
         w.stop()
+    await container_reaper.stop()
     # Cancel and gather all background tasks
     tasks_to_cancel = list(app.state.background_tasks)
     for task in tasks_to_cancel:
