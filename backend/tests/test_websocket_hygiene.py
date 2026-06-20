@@ -22,20 +22,24 @@ async def test_websocket_heartbeat_timeout_closes_connection():
         
         async def mock_sleep(seconds):
             if seconds in (30, 10):
-                # Don't actually sleep 30s or 10s in unit tests
+                # Yield to the event loop briefly instead of starvation
+                await original_sleep(0.001)
                 return
             await original_sleep(seconds)
         
-        with patch("asyncio.sleep", mock_sleep), patch("time.time") as mock_time:
-            # First call is last_pong_received initialization (time 0)
-            # Second call is inside heartbeat loop after sleep(30) + sleep(10) (time 41)
-            # Third call is also inside time.time() check
-            mock_time.side_effect = [0, 41, 41, 41, 41]
-            
+        current_time = [0.0]
+        
+        with patch("asyncio.sleep", mock_sleep), patch("time.time", lambda: current_time[0]):
             task = asyncio.create_task(websocket_endpoint(websocket, "test_client"))
             
-            # Allow task to run
-            await original_sleep(0.05)
+            # Let it run the first iteration
+            await original_sleep(0.02)
+            
+            # Advance time to trigger timeout
+            current_time[0] = 45.0
+            
+            # Let it run the check
+            await original_sleep(0.02)
             
             assert websocket.close.called
             
@@ -44,3 +48,4 @@ async def test_websocket_heartbeat_timeout_closes_connection():
                 await task
             except Exception:
                 pass
+
