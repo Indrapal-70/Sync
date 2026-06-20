@@ -89,6 +89,7 @@ app.include_router(websocket_router.router)
 app.include_router(models_router.router)
 from app.routers import templates
 app.include_router(templates.router)
+app.include_router(templates.router_v1)
 app.include_router(analytics.router)
 app.include_router(analytics.router_v1)
 app.include_router(system.router)
