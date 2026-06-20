@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, DateTime, JSON
+from sqlalchemy import Column, String, DateTime, JSON, Boolean, Integer
 
 from app.database.session import Base
 
@@ -15,5 +15,13 @@ class WorkflowTemplate(Base):
     # Example: [{"name": "Task 1", "agent_name": "coder", "description": "...", "dependencies": []}]
     tasks_schema = Column(JSON, nullable=False, default=list)
     
+    version = Column(String, nullable=False, default="1.0.0")
+    parent_template_id = Column(String, nullable=True)
+    is_public = Column(Boolean, nullable=False, default=False)
+    tags = Column(JSON, nullable=True, default=list)
+    author = Column(String, nullable=True)
+    usage_count = Column(Integer, nullable=False, default=0)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
