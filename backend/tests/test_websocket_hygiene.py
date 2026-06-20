@@ -46,6 +46,6 @@ async def test_websocket_heartbeat_timeout_closes_connection():
             task.cancel()
             try:
                 await task
-            except Exception:
+            except asyncio.CancelledError:
                 pass
 
