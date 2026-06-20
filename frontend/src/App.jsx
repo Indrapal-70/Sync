@@ -8,6 +8,8 @@ import NodeBuilderPage from './pages/NodeBuilderPage.jsx'
 import WorkflowViewerPage from './pages/WorkflowViewerPage.jsx'
 import TerminalLogsPage from './pages/TerminalLogsPage.jsx'
 import ProjectSettingsPage from './pages/ProjectSettingsPage.jsx'
+import AnalyticsDashboardPage from './pages/AnalyticsDashboardPage.jsx'
+import TemplateMarketplacePage from './pages/TemplateMarketplacePage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
 
 function App() {
@@ -20,6 +22,8 @@ function App() {
         <Route path="/workflows/:id" element={<WorkflowsPage />} />
         <Route path="/workflows/:id/builder" element={<WorkflowViewerPage />} />
         <Route path="/builder" element={<NodeBuilderPage />} />
+        <Route path="/marketplace" element={<TemplateMarketplacePage />} />
+        <Route path="/analytics" element={<AnalyticsDashboardPage />} />
         <Route path="/agents" element={<AgentFleetPage />} />
         <Route path="/agents/:id" element={<AgentFleetPage />} />
         <Route path="/logs" element={<TerminalLogsPage />} />
