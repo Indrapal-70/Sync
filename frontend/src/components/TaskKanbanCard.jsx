@@ -39,6 +39,17 @@ function TaskKanbanCard({ task }) {
       <p className="text-[13px] text-[#888888] mb-4 line-clamp-2">
         {task.description}
       </p>
+      {task.status === 'queued' && (
+        <div className="mb-3 flex items-center justify-between px-3 py-1.5 bg-[#f59e0b]/10 border border-[#f59e0b]/30 rounded-md text-[12px] text-[#f59e0b] animate-pulse">
+          <span className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#f59e0b]" />
+            Queued
+          </span>
+          <span className="font-mono bg-[#f59e0b]/20 px-1.5 py-0.5 rounded text-[10px]">
+            Position {task.queuePosition !== undefined ? task.queuePosition : '?'}
+          </span>
+        </div>
+      )}
       {task.pipeline_stage && (
         <div className="mb-3">
           <PipelineStageIndicator
