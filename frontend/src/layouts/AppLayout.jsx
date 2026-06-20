@@ -19,6 +19,7 @@ const navItems = [
   { label: 'Orchestration', icon: LayoutDashboard, to: '/orchestration' },
   { label: 'Workflows', icon: GitBranch, to: '/workflows' },
   { label: 'Visual Editor', icon: Network, to: '/builder' },
+  { label: 'Analytics', icon: Activity, to: '/analytics' },
   { label: 'Agent Fleet', icon: Bot, to: '/agents' },
   { label: 'Terminal Logs', icon: ScrollText, to: '/logs' },
   { label: 'Project Settings', icon: Settings, to: '/settings' },
