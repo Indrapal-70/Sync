@@ -130,7 +130,7 @@ def fork_template(template_id: str, payload: Optional[TemplateFork] = None, db: 
     if not parent:
         raise HTTPException(status_code=404, detail="Template not found")
     
-    fork_name = (payload.name if payload and payload.name) else f"Fork of {parent.name}"
+    fork_name = payload.name if (payload and payload.name) else f"Fork of {parent.name}"
     fork_author = payload.author if payload else None
     
     fork = WorkflowTemplate(
