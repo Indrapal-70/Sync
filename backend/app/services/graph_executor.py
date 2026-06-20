@@ -123,18 +123,17 @@ class GraphExecutor:
             "info")
 
         # Trigger background execution
-        def run_graph_sync(wf_id, tasks):
-            from app.database.session import SessionLocal
-            from app.agents.pipeline_orchestrator import run_pipeline
-            db_session = SessionLocal()
-            try:
-                asyncio.run(run_pipeline(wf_id, db_session, execution_mode="graph", task_order=tasks))
-            finally:
-                db_session.close()
-                
-        background_tasks.add_task(run_graph_sync, workflow_id, [str(t.id) for t in tasks_created])
+        from app.services.execution_queue import execution_queue
+        payload = {
+            "task_id": workflow_id,
+            "mode": "graph",
+            "args": {
+                "workflow_id": workflow_id
+            }
+        }
+        pos = await execution_queue.enqueue(workflow_id, payload)
 
-        return tasks_created
+        return tasks_created, pos
 
     async def run_graph(self, workflow_id: str, db):
         """Execute a graph dynamically using custom DAG running engine with auto-healing loops."""
