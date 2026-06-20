@@ -300,6 +300,8 @@ function NodeBuilderInner() {
   const [savedTemplate, setSavedTemplate] = useState(null)
   const [templateName, setTemplateName] = useState('')
   const [templateDesc, setTemplateDesc] = useState('')
+  const [templateTags, setTemplateTags] = useState('')
+  const [templateIsPublic, setTemplateIsPublic] = useState(false)
 
   const [isExecuting, setIsExecuting] = useState(false)
   const [executedWorkflow, setExecutedWorkflow] = useState(null)
@@ -653,6 +655,8 @@ function NodeBuilderInner() {
     setSaveModalOpen(true)
     setTemplateName(graphName || 'Untitled Graph')
     setTemplateDesc('')
+    setTemplateTags('')
+    setTemplateIsPublic(false)
   }, [graphName])
 
   const confirmSaveTemplate = useCallback(async () => {
@@ -664,7 +668,18 @@ function NodeBuilderInner() {
     setIsSaving(true)
     try {
       const payload = graphToTemplate(nodes, edges, templateName, templateDesc)
-      const template = await templateService.create(payload)
+      const tagsArray = templateTags
+        .split(',')
+        .map(t => t.trim())
+        .filter(t => t.length > 0)
+      
+      const enrichedPayload = {
+        ...payload,
+        tags: tagsArray,
+        is_public: templateIsPublic,
+        version: "1.0.0"
+      }
+      const template = await templateService.create(enrichedPayload)
       setSavedTemplate(template)
       setSaveModalOpen(false)
       // We will show a toast later or an alert here
@@ -677,7 +692,7 @@ function NodeBuilderInner() {
     } finally {
       setIsSaving(false)
     }
-  }, [nodes, edges, templateName, templateDesc])
+  }, [nodes, edges, templateName, templateDesc, templateTags, templateIsPublic])
 
   const handleExecuteNow = async () => {
     const errors = validateGraph(nodes, edges)
@@ -1112,6 +1127,28 @@ function NodeBuilderInner() {
                     placeholder="What does this template do?"
                     rows={3}
                   />
+                </div>
+                <div className="ncp-field" style={{ marginTop: '16px' }}>
+                  <label className="ncp-label">Tags <span className="ncp-optional">(comma-separated)</span></label>
+                  <input
+                    type="text"
+                    className="ncp-input"
+                    value={templateTags}
+                    onChange={(e) => setTemplateTags(e.target.value)}
+                    placeholder="e.g. nlp, python, scraper"
+                  />
+                </div>
+                <div className="ncp-field" style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input
+                    type="checkbox"
+                    id="is-public-checkbox"
+                    checked={templateIsPublic}
+                    onChange={(e) => setTemplateIsPublic(e.target.checked)}
+                    style={{ cursor: 'pointer', width: '14px', height: '14px' }}
+                  />
+                  <label htmlFor="is-public-checkbox" className="ncp-label" style={{ margin: 0, cursor: 'pointer', textTransform: 'none' }}>
+                    Publish to Public Marketplace
+                  </label>
                 </div>
               </div>
               <div className="nb-modal-footer">
