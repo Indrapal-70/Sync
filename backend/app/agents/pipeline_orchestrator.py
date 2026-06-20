@@ -97,6 +97,27 @@ async def _run_graph_mode(workflow_id: str, task_ids: list, db):
 
 
 
+async def _run_agent_with_metrics(agent_inst, context, task_id) -> dict:
+    import time
+    from app.services.metrics_service import metrics_service
+    start = time.time()
+    result = await agent_inst.run(context)
+    duration_ms = (time.time() - start) * 1000.0
+    
+    entries = agent_context_buffer._store.get(str(task_id), [])
+    if entries:
+        last_entry = entries[-1]
+        await metrics_service.record_agent_run(
+            task_id=str(task_id),
+            agent_name=last_entry.agent_name,
+            step=last_entry.step,
+            status=last_entry.status,
+            duration_ms=duration_ms,
+            healing_cycle=last_entry.healing_cycle
+        )
+    return result
+
+
 async def _run_task_pipeline(task: Task, workflow_id: UUID, db: Session) -> bool:
     task_id = task.id
     context = {
@@ -111,7 +132,7 @@ async def _run_task_pipeline(task: Task, workflow_id: UUID, db: Session) -> bool
     _set_task(db, task, status="running", current_agent="coder", pipeline_stage="coding")
 
     coder = CoderAgent(db, workflow_id, task_id)
-    coder_result = await coder.run(context)
+    coder_result = await _run_agent_with_metrics(coder, context, task_id)
     coder_result["model_used"] = _get_model_for_agent("coder")
     create_log(db, workflow_id, f"[CODER] Completed via {coder_result['model_used']}", "debug", task_id)
     _save_agent_output(db, task, "coder", coder_result)
@@ -129,7 +150,7 @@ async def _run_task_pipeline(task: Task, workflow_id: UUID, db: Session) -> bool
     while debug_attempts <= MAX_DEBUG_RETRIES:
         _set_task(db, task, current_agent="tester", pipeline_stage="testing")
         tester = TesterAgent(db, workflow_id, task_id)
-        test_result = await tester.run(context)
+        test_result = await _run_agent_with_metrics(tester, context, task_id)
         test_result["model_used"] = _get_model_for_agent("tester")
         create_log(db, workflow_id, f"[TESTER] Completed via {test_result['model_used']}", "debug", task_id)
         context["test_results"] = test_result
@@ -170,7 +191,7 @@ async def _run_task_pipeline(task: Task, workflow_id: UUID, db: Session) -> bool
             retry_count=debug_attempts,
         )
         debugger = DebuggerAgent(db, workflow_id, task_id)
-        debug_result = await debugger.run(context)
+        debug_result = await _run_agent_with_metrics(debugger, context, task_id)
         debug_result["model_used"] = _get_model_for_agent("debugger")
         create_log(db, workflow_id, f"[DEBUGGER] Completed via {debug_result['model_used']}", "debug", task_id)
         _save_agent_output(db, task, "debugger", debug_result)
@@ -192,7 +213,7 @@ async def _run_task_pipeline(task: Task, workflow_id: UUID, db: Session) -> bool
     while review_attempts <= MAX_REVIEW_RETRIES:
         _set_task(db, task, current_agent="reviewer", pipeline_stage="reviewing")
         reviewer = ReviewerAgent(db, workflow_id, task_id)
-        review_result = await reviewer.run(context)
+        review_result = await _run_agent_with_metrics(reviewer, context, task_id)
         review_result["model_used"] = _get_model_for_agent("reviewer")
         create_log(db, workflow_id, f"[REVIEWER] Completed via {review_result['model_used']}", "debug", task_id)
         _save_agent_output(db, task, "reviewer", review_result)
@@ -219,7 +240,7 @@ async def _run_task_pipeline(task: Task, workflow_id: UUID, db: Session) -> bool
 
         _set_task(db, task, current_agent="coder", pipeline_stage="coding_revision")
         coder = CoderAgent(db, workflow_id, task_id)
-        coder_result = await coder.run(context)
+        coder_result = await _run_agent_with_metrics(coder, context, task_id)
         coder_result["model_used"] = _get_model_for_agent("coder")
         create_log(db, workflow_id, f"[CODER] Completed via {coder_result['model_used']}", "debug", task_id)
         if coder_result["success"]:
