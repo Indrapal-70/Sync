@@ -37,14 +37,33 @@ async def lifespan(app: FastAPI):
     else:
         print("[SYNC] WARNING: Some models unavailable - fallback active")
 
-    asyncio.create_task(start_broadcaster())
+    # Start background broadcaster
+    broadcaster_task = asyncio.create_task(start_broadcaster())
+    app.state.background_tasks = {broadcaster_task}
+    broadcaster_task.add_done_callback(app.state.background_tasks.discard)
     print("[SYNC] Redis broadcaster started")
+
+    # Start queued pipeline workers
+    from app.core.config import MAX_CONCURRENT_PIPELINES
+    from app.services.pipeline_worker import PipelineWorker
+    workers = [PipelineWorker(i) for i in range(MAX_CONCURRENT_PIPELINES)]
+    worker_tasks = [asyncio.create_task(w.run_forever()) for w in workers]
+    for task in worker_tasks:
+        app.state.background_tasks.add(task)
+        task.add_done_callback(app.state.background_tasks.discard)
 
     skills = list_skills()
     print(f"[SYNC] {len(skills)} skills loaded: {[s['name'] for s in skills]}")
     yield
     # ── Shutdown ─────────────────────────────────────────────────────
     print("[SYNC] Shutting down...")
+    for w in workers:
+        w.stop()
+    # Cancel and gather all background tasks
+    tasks_to_cancel = list(app.state.background_tasks)
+    for task in tasks_to_cancel:
+        task.cancel()
+    await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
 
 
 app = FastAPI(
