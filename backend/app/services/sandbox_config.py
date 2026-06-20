@@ -1,4 +1,5 @@
 # backend/app/services/sandbox_config.py
+import os
 
 SANDBOX_IMAGE = "python:3.11-slim"
 SANDBOX_MEMORY_LIMIT = "256m"
@@ -6,3 +7,5 @@ SANDBOX_CPU_LIMIT = "0.5"
 SANDBOX_TIMEOUT_SECONDS = 30
 SANDBOX_USER = "1000:1000"
 SANDBOX_MAX_OUTPUT_BYTES = 1024 * 1024  # 1MB stdout cap
+
+MAX_CONCURRENT_SANDBOXES = int(os.getenv("MAX_CONCURRENT_SANDBOXES", "3"))
