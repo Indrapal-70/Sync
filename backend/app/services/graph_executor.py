@@ -279,9 +279,28 @@ class GraphExecutor:
                         }
 
                 try:
+                    import time
+                    from app.services.metrics_service import metrics_service
+                    
                     agent_cls = get_agent_for_type(task.agent_name)
                     agent_inst = agent_cls(db, workflow_id, task_id)
+                    
+                    start_time = time.time()
                     result = await agent_inst.run(context)
+                    duration_ms = (time.time() - start_time) * 1000.0
+                    
+                    # Record run metric
+                    entries = agent_context_buffer._store.get(str(task_id), [])
+                    if entries:
+                        last_entry = entries[-1]
+                        await metrics_service.record_agent_run(
+                            task_id=str(task_id),
+                            agent_name=last_entry.agent_name,
+                            step=last_entry.step,
+                            status=last_entry.status,
+                            duration_ms=duration_ms,
+                            healing_cycle=last_entry.healing_cycle
+                        )
 
                     # Determine pass/fail status
                     status_str = result.get("status")
@@ -308,6 +327,7 @@ class GraphExecutor:
                         if str(task_id) in self.healing_logs:
                             for entry in self.healing_logs[str(task_id)]:
                                 entry["resolved"] = True
+                                await metrics_service.mark_healing_resolved(str(task_id), entry["cycle"])
                         await agent_context_buffer.clear(task_id)
                     else:
                         # Auto-healing sequence
@@ -335,6 +355,21 @@ class GraphExecutor:
                             )
                             graph = patched_graph
                             self.active_graphs[str(workflow_id)] = patched_graph
+
+                            # Record healing event in metrics DB
+                            injected_node_ids = []
+                            for n in patched_graph["nodes"]:
+                                if n["data"].get("spawned_by_healing") and n["data"].get("cycle") == cycles + 1:
+                                    injected_node_ids.append(n["id"])
+                            error_summary = str(result.get("error") or result.get("stderr") or "Unknown error")
+                            
+                            await metrics_service.record_healing_event(
+                                task_id=str(task_id),
+                                cycle=cycles + 1,
+                                failed_agent=task.agent_name,
+                                error_summary=error_summary,
+                                injected_node_ids=injected_node_ids
+                            )
 
                             # Broadcast graph_patched
                             publish_event("graph_patched", {
