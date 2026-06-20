@@ -1,9 +1,10 @@
 # backend/tests/conftest.py
 
 import pytest
+import pytest_asyncio
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 from main import app  # Imported from backend/main.py
 
 
@@ -19,10 +20,10 @@ def event_loop():
 
 # ─── FastAPI Test Client ───────────────────────────────────────────────────────
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def async_client():
     """Async HTTP client wired to the FastAPI app."""
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         yield client
 
 
