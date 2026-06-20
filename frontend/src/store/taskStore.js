@@ -68,6 +68,24 @@ const useTaskStore = create((set, get) => ({
     if (event === 'task_deleted') {
       set({ tasks: get().tasks.filter((task) => task.id !== payload.id) })
     }
+    if (event === 'queue_position_updated') {
+      set({
+        tasks: get().tasks.map((task) =>
+          task.id === payload.task_id
+            ? { ...task, status: 'queued', queuePosition: payload.position }
+            : task
+        ),
+      })
+    }
+    if (event === 'task_dequeued') {
+      set({
+        tasks: get().tasks.map((task) =>
+          task.id === payload.task_id
+            ? { ...task, status: 'running' }
+            : task
+        ),
+      })
+    }
     if (event === 'agent_status_changed') {
       set({
         tasks: get().tasks.map((task) =>
