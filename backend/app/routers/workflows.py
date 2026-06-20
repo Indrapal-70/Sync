@@ -220,12 +220,21 @@ async def execute_workflow(
             },
         )
 
-    background_tasks.add_task(run_pipeline_sync, workflow_id)
+    from app.services.execution_queue import execution_queue
+    payload = {
+        "task_id": str(workflow_id),
+        "mode": "pipeline",
+        "args": {
+            "workflow_id": str(workflow_id)
+        }
+    }
+    pos = await execution_queue.enqueue(str(workflow_id), payload)
 
     return {
         "message": "Pipeline started",
         "workflow_id": str(workflow_id),
         "tasks_created": len(created_tasks),
+        "queue_position": pos,
     }
 
 from app.schemas.graph import GraphExecuteRequest, GraphExecuteResponse
@@ -259,7 +268,7 @@ async def execute_graph(
     db.refresh(workflow)
 
     # 3. Create tasks + trigger execution
-    tasks = await graph_executor.execute_graph(
+    tasks, queue_pos = await graph_executor.execute_graph(
         str(workflow.id),
         sorted_nodes,
         db,
@@ -278,7 +287,8 @@ async def execute_graph(
         workflow_id=str(workflow.id),
         task_count=len(tasks),
         exec_order=[n.name for n in sorted_nodes],
-        message=f"Graph workflow started with {len(tasks)} tasks in dependency order"
+        message=f"Graph workflow started with {len(tasks)} tasks in dependency order",
+        queue_position=queue_pos
     )
 
 @router.post("/{workflow_id}/save-as-template")
