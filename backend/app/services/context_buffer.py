@@ -21,6 +21,7 @@ class ContextEntry:
 class AgentContextBuffer:
     def __init__(self, max_entries_per_task: int = 20):
         self._store: Dict[str, List[ContextEntry]] = {}
+        self._last_accessed: Dict[str, float] = {}
         self._lock = asyncio.Lock()
         self._max_entries = max_entries_per_task
 
@@ -28,6 +29,7 @@ class AgentContextBuffer:
         """Thread-safe append. Trims to max_entries_per_task (oldest removed first)."""
         async with self._lock:
             tid_str = str(task_id)
+            self._last_accessed[tid_str] = time.time()
             if entry.timestamp == 0.0:
                 entry.timestamp = time.time()
             
@@ -60,6 +62,7 @@ class AgentContextBuffer:
         """
         async with self._lock:
             tid_str = str(task_id)
+            self._last_accessed[tid_str] = time.time()
             entries = self._store.get(tid_str, [])
             if not entries:
                 return []
@@ -117,6 +120,21 @@ class AgentContextBuffer:
     async def clear(self, task_id: str) -> None:
         """Remove all entries for a task. Call when task completes or is cancelled."""
         async with self._lock:
-            self._store.pop(str(task_id), None)
+            tid_str = str(task_id)
+            self._store.pop(tid_str, None)
+            self._last_accessed.pop(tid_str, None)
+
+    async def sweep_stale(self, max_age_seconds: float) -> int:
+        """Evict inactive context structures that haven't been accessed in max_age_seconds."""
+        async with self._lock:
+            now = time.time()
+            stale_ids = [
+                tid for tid, last_time in self._last_accessed.items()
+                if now - last_time > max_age_seconds
+            ]
+            for tid in stale_ids:
+                self._store.pop(tid, None)
+                self._last_accessed.pop(tid, None)
+            return len(stale_ids)
 
 agent_context_buffer = AgentContextBuffer()
