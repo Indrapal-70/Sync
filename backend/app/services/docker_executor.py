@@ -58,6 +58,7 @@ class DockerExecutor:
         test_code: str,
         language: str = "python",
         timeout_seconds: int = 30,
+        task_id: str = "unknown",
     ) -> dict:
         """Run code inside a sandboxed Docker container."""
         # Double check availability (if not checked yet or explicitly false)
@@ -105,35 +106,37 @@ class DockerExecutor:
                 "python", "-m", "pytest", "test_main.py", "-v", "--tb=short"
             ]
 
-            logger.info(f"Starting sandbox run {container_name}")
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-
-            try:
-                stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                    proc.communicate(),
-                    timeout=timeout_seconds
+            from app.services.sandbox_pool import sandbox_pool
+            async with sandbox_pool.acquire_slot(task_id):
+                logger.info(f"Starting sandbox run {container_name}")
+                proc = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
                 )
-                timed_out = False
-                exit_code = proc.returncode
-            except asyncio.TimeoutError:
-                timed_out = True
-                exit_code = -1
-                logger.warning(f"Sandbox run {container_name} timed out. Killing container.")
-                # Kill container
+
                 try:
-                    kill_proc = await asyncio.create_subprocess_exec(
-                        "docker", "kill", container_name,
-                        stdout=asyncio.subprocess.DEVNULL,
-                        stderr=asyncio.subprocess.DEVNULL
+                    stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                        proc.communicate(),
+                        timeout=timeout_seconds
                     )
-                    await kill_proc.wait()
-                except Exception as ke:
-                    logger.error(f"Failed to kill timed out container {container_name}: {ke}")
-                stdout_bytes, stderr_bytes = b"", b"Execution timed out"
+                    timed_out = False
+                    exit_code = proc.returncode
+                except asyncio.TimeoutError:
+                    timed_out = True
+                    exit_code = -1
+                    logger.warning(f"Sandbox run {container_name} timed out. Killing container.")
+                    # Kill container
+                    try:
+                        kill_proc = await asyncio.create_subprocess_exec(
+                            "docker", "kill", container_name,
+                            stdout=asyncio.subprocess.DEVNULL,
+                            stderr=asyncio.subprocess.DEVNULL
+                        )
+                        await kill_proc.wait()
+                    except Exception as ke:
+                        logger.error(f"Failed to kill timed out container {container_name}: {ke}")
+                    stdout_bytes, stderr_bytes = b"", b"Execution timed out"
 
             duration_ms = (time.time() - start_time) * 1000.0
 
